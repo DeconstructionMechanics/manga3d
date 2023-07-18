@@ -1,0 +1,81 @@
+#pragma once
+
+#include <eigen3/Eigen/Eigen>
+#include <vector>
+#include <limits>
+
+#define EPSILON 0.000001
+#define MIN std::numeric_limits<float>::min()
+#define MAX std::numeric_limits<float>::max()
+
+inline void minimize(float& min,const float a){
+    if(a < min){
+        min = a;
+    }
+}
+
+inline void maximize(float& max,const float a){
+    if(a > max){
+        max = a;
+    }
+}
+
+inline void minmaxize(float& min,float& max,const float a){
+    if(a < min){
+        min = a;
+    }
+    else if(a > max){
+        max = a;
+    }
+}
+
+inline const float min(const float a,const float b){
+    if(a < b){
+        return a;
+    }
+    return b;
+}
+inline const float min(const float a,const float b,const float c){
+    if(a < b && a < c){
+        return a;
+    }
+    if(b < a && b < c){
+        return b;
+    }
+    return c;
+}
+
+inline const float max(const float a,const float b){
+    if(a > b){
+        return a;
+    }
+    return b;
+}
+inline const float max(const float a,const float b,const float c){
+    if(a > b && a > c){
+        return a;
+    }
+    if(b > a && b > c){
+        return b;
+    }
+    return c;
+}
+
+inline const Eigen::Vector3f min(const Eigen::Vector3f a,const Eigen::Vector3f b){
+    return Eigen::Vector3f(min(a.x(),b.x()),min(a.y(),b.y()),min(a.z(),b.z()));
+}
+inline const Eigen::Vector3f min(const Eigen::Vector3f a,const Eigen::Vector3f b,const Eigen::Vector3f c){
+    return Eigen::Vector3f(min(a.x(),b.x(),c.x()),min(a.y(),b.y(),c.y()),min(a.z(),b.z(),c.z()));
+}
+
+inline const Eigen::Vector3f max(const Eigen::Vector3f a,const Eigen::Vector3f b){
+    return Eigen::Vector3f(max(a.x(),b.x()),max(a.y(),b.y()),max(a.z(),b.z()));
+}
+inline const Eigen::Vector3f max(const Eigen::Vector3f a,const Eigen::Vector3f b,const Eigen::Vector3f c){
+    return Eigen::Vector3f(max(a.x(),b.x(),c.x()),max(a.y(),b.y(),c.y()),max(a.z(),b.z(),c.z()));
+}
+
+
+inline const bool equal(const float a,const float b){
+    return ((0 < a - b && a - b < EPSILON) || (0 < b - a && b - a < EPSILON));
+}
