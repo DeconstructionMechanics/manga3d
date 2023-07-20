@@ -71,8 +71,8 @@ namespace BVH{
         }
 
         Obj::Triangle* triangle_insert(Obj::Ray ray){
-
+            return NULL;
         }
-        
+
     };
 }
