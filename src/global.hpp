@@ -5,8 +5,8 @@
 #include <limits>
 
 #define EPSILON 0.000001
-#define MIN std::numeric_limits<float>::min()
-#define MAX std::numeric_limits<float>::max()
+#define MIN_F std::numeric_limits<float>::min()
+#define MAX_F std::numeric_limits<float>::max()
 
 inline void minimize(float& min,const float a){
     if(a < min){

@@ -27,7 +27,7 @@ namespace BVH{
                 right = nullptr;
             }
             else{
-                float min_x = MAX,max_x = MIN,min_y = MAX,max_y = MIN,min_z = MAX,max_z = MIN;
+                float min_x = MAX_F,max_x = MIN_F,min_y = MAX_F,max_y = MIN_F,min_z = MAX_F,max_z = MIN_F;
                 for(const Obj::Triangle* t : triangles){
                     Eigen::Vector3f A_position = t->A->position;
                     minmaxize(min_x,max_x,A_position.x());
