@@ -1,19 +1,40 @@
 #include <iostream>
 #include <vector>
+#include <opencv2/opencv.hpp>
 
 #include "global.hpp"
 #include "OBJ.hpp"
 #include "BVH.hpp"
+#include "rasterizer.hpp"
+
 
 int main(){
-    std::vector<Obj::Vertex*> vertices;
-    std::vector<Obj::Edge*> edges;
-    std::vector<Obj::Triangle*> triangles;
-    std::string path = ".\\model\\cow\\spot_triangulated.obj";
-    obj_loader(vertices,edges,triangles,path);
-    std::cout << vertices.size() << " " << edges.size() << " " << triangles.size() << std::endl;
-    BVH::Node* bvh_node = new BVH::Node(triangles);
-    std::cout << bvh_node->bbox.low_bound << std::endl << bvh_node->bbox.high_bound << std::endl;
-    obj_deletor(vertices,edges,triangles);
+    Raster::Rasterizer raster;
+    int wi = 80;
+    int hi = 60;
+    int key = 0;
+
+    raster.camera.w = wi;
+    raster.camera.h = hi;
+    for(int h = 0;h < hi;h++){
+        for(int w = 0;w < wi;w++){
+            raster.camera.top_buff.push_back(Eigen::Vector3f(w / (float)wi,h / (float)hi,0));
+        }
+    }
     
+    auto a = raster.camera.top_buff.data();
+    
+    
+    while (key != 27){
+        cv::Mat image(raster.camera.h, raster.camera.w, CV_32FC3, raster.camera.top_buff.data());
+        image *= 256;
+        image.convertTo(image, CV_8UC3);
+        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
+        cv::imshow("image", image);
+        key = cv::waitKey(0);
+        std::cout << image << std::endl;
+    }
+    
+
+    return 0;
 }

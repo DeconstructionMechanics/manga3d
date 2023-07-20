@@ -69,5 +69,10 @@ namespace BVH{
             left = nullptr;
             right = nullptr;
         }
+
+        Obj::Triangle* triangle_insert(Obj::Ray ray){
+
+        }
+        
     };
 }

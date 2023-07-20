@@ -50,8 +50,7 @@ namespace Obj{
     public:
         enum class Express{
             DIRECTION,
-            ENDPOINT,
-            BOTH
+            ENDPOINT
         };
         Vector3f origin;
         std::optional<Vector3f> direction;
