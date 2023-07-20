@@ -15,11 +15,15 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename)
     cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
     int key = 0;
     if(filename.has_value()){
+#if defined(_WIN32) || defined(_WIN64)
         std::string path = ".\\output\\";
+#else
+        std::string path = "./output/";
+#endif
         std::string suffix = ".png";
-        cv::imwrite(path + filename.value() + suffix,image);
+        cv::imwrite(path + filename.value() + suffix, image);
     }
-    while (key != 27){
+    while(key != 27){
         cv::imshow("image", image);
         key = cv::waitKey(0);
     }
@@ -34,13 +38,13 @@ int main(){
     raster.camera.h = hi;
     for(int h = 0;h < hi;h++){
         for(int w = 0;w < wi;w++){
-            raster.camera.top_buff.push_back(Eigen::Vector3f(w / (float)wi,h / (float)hi,0));
+            raster.camera.top_buff.push_back(Eigen::Vector3f(w / (float)wi, h / (float)hi, 0));
         }
     }
-    show_image(raster,"eg");    
-    
-    
-    
+    show_image(raster, "eg");
+
+
+
 
     return 0;
 }
