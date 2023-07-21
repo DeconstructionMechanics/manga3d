@@ -9,10 +9,18 @@
 
 
 void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename){
-    cv::Mat image(raster.camera.h, raster.camera.w, CV_32FC3, raster.camera.top_buff.data());
-    image *= 256;
-    image.convertTo(image, CV_8UC3);
-    cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
+    cv::Mat image;
+    if(raster.camera.image_color == Raster::ImageColor::FULLCOLOR){
+        image = cv::Mat(raster.camera.h, raster.camera.w, CV_32FC3, raster.camera.top_buff);
+        image *= 256;
+        image.convertTo(image, CV_8UC3);
+        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
+    }
+    else{
+        image = cv::Mat(raster.camera.h, raster.camera.w, CV_32FC1, raster.camera.top_buff);
+        image *= 256;
+        image.convertTo(image, CV_8UC1);
+    }
     int key = 0;
     if(filename.has_value()){
 #if defined(_WIN32) || defined(_WIN64)
@@ -30,17 +38,12 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename)
 }
 
 int main(){
-    Raster::Rasterizer raster;
-    int wi = 80;
-    int hi = 60;
+    Raster::Rasterizer raster(".\\model\\cow\\spot_triangulated.obj",Raster::ImageColor::BLACKWHITE,80,60);
 
-    raster.camera.w = wi;
-    raster.camera.h = hi;
-    for(int h = 0;h < hi;h++){
-        for(int w = 0;w < wi;w++){
-            raster.camera.top_buff.push_back(Eigen::Vector3f(w / (float)wi, h / (float)hi, 0));
-        }
-    }
+    raster.camera.fovY = PI / 2;
+    raster.camera.position = Eigen::Vector3f(10,0,0);
+    raster.camera.lookat_g = Eigen::Vector3f(-1,0,0);
+    raster.camera.up_t = PI / 4;
     show_image(raster, "eg");
 
 

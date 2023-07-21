@@ -3,6 +3,9 @@
 #include <eigen3/Eigen/Eigen>
 #include <vector>
 #include <limits>
+#include <cmath>
+
+#define PI 3.14159265359f
 
 #define EPSILON 0.000001
 #define MIN_F std::numeric_limits<float>::min()

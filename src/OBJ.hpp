@@ -3,7 +3,6 @@
 #include <optional>
 #include <fstream>
 #include <string>
-#include <vector>
 
 #include "global.hpp"
 
@@ -54,6 +53,7 @@ namespace Obj{
         };
         Vector3f origin;
         std::optional<Vector3f> direction;
+        std::optional<float> t;
         std::optional<Vector3f> end;
         Ray(Express express,Vector3f& origin,Vector3f& b) : origin(origin) {
             if(express == Express::DIRECTION){
@@ -67,6 +67,7 @@ namespace Obj{
             if(end.has_value() && !direction.has_value()){
                 Eigen::Vector3f direction_temp = end.value() - origin;
                 direction = direction_temp.normalized();
+                t = direction_temp.norm();
             }
         }
     };
