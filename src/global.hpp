@@ -82,3 +82,7 @@ inline const Eigen::Vector3f max(const Eigen::Vector3f a,const Eigen::Vector3f b
 inline const bool equal(const float a,const float b){
     return ((0 < a - b && a - b < EPSILON) || (0 < b - a && b - a < EPSILON));
 }
+
+inline const bool iszero(const float a){
+    return ((0 < a && a < EPSILON) || (0 < - a && - a < EPSILON));
+}
