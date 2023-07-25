@@ -92,14 +92,11 @@ private:
     std::optional<Eigen::Matrix4f> upcamera_matrix_cache; //up_t
     std::optional<Eigen::Matrix4f> putcamera_matrix_cache; //movecamera_matrix_cache rotatecamera_matrix_cache upcamera_matrix_cache
 
+    std::optional<Eigen::Matrix4f> ortho_matrix_cache; //w h fov
+    std::optional<Eigen::Matrix4f> ortho_cache; //putcamera_matrix_cache ortho_matrix_cache
     std::optional<Eigen::Matrix4f> persp_matrix_cache; //near far
-
-    std::optional<Eigen::Matrix4f> viewport_matrix_cache; //w h
-    std::optional<Eigen::Matrix4f> scaleviewport_matrix_cache; //near fov viewport_matrix_cache
-    std::optional<Eigen::Matrix4f> fisheyeviewport_matrix_cache; //fov viewport_matrix_cache
-
-    std::optional<Eigen::Matrix4f> ortho_cache; //putcamera_matrix_cache scaleviewport_matrix_cache
-    std::optional<Eigen::Matrix4f> persp_cache; //putcamera_matrix_cache persp_matrix_cache scaleviewport_matrix_cache
+    std::optional<Eigen::Matrix4f> persp_cache; //putcamera_matrix_cache persp_matrix_cache ortho_matrix_cache
+    std::optional<Eigen::Matrix4f> fisheyeviewport_matrix_cache; //w h fov
 
 public:
     void config(Projection projection_type, Raster::ImageColor image_color, int w, int h, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat_g, float up_t = 0, float near = 0.0001, float far = 10000){
@@ -117,9 +114,9 @@ public:
         if(!movecamera_matrix_cache || position != this->position){
             this->position = position;
             Eigen::Matrix4f Move;
-            Move << 1, 0, 0, position.x(),
-                0, 1, 0, position.y(),
-                0, 0, 1, position.z(),
+            Move << 1, 0, 0, -position.x(),
+                0, 1, 0, -position.y(),
+                0, 0, 1, -position.z(),
                 0, 0, 0, 1;
             movecamera_matrix_cache = Move;
             putcamera_changed = true;
@@ -158,66 +155,67 @@ public:
             putcamera_changed = true;
         }
 
+        //update ortho_matrix_cache
+        bool ortho_changed = false;
+        if(!ortho_matrix_cache || w != this->w || h != this->h || !equal(fovY, this->fovY)){
+            this->w = w;
+            this->h = h;
+            this->fovY = fovY;
+            Eigen::Matrix4f ViewPort;
+            float half_w = w / 2.0;
+            float half_h = h / 2.0;
+            float scale = half_w / std::tan(fovY / 2);
+            ViewPort << scale, 0, 0, half_w,
+                0, -scale, 0, half_h,
+                0, 0, 1, 0,
+                0, 0, 0, 1;
+            ortho_matrix_cache = ViewPort;
+            ortho_changed = true;
+        }
+        if(!ortho_cache || putcamera_changed || ortho_changed){
+            ortho_cache = ortho_matrix_cache.value() * putcamera_matrix_cache.value();
+        }
+
         //update persp_matrix_cache
         bool persp_changed = false;
-        if(!persp_matrix_cache || (!equal(near, this->near) || !equal(far, this->far))){
+        if(!persp_matrix_cache || !equal(near, this->near) || !equal(far, this->far)){
             this->near = near;
             this->far = far;
+            this->w = w;
+            this->h = h;
+            this->fovY = fovY;
             Eigen::Matrix4f Proj;
-            Proj << near, 0, 0, 0,
-                0, near, 0, 0,
+            float half_w = w / 2.0;
+            float half_h = h / 2.0;
+            float scale = half_w / std::tan(fovY / 2);
+            Proj << 1, 0, 0, 0,
+                0, 1, 0, 0,
                 0, 0, (near + far), (near * far),
                 0, 0, -1, 0;
             persp_matrix_cache = Proj;
             persp_changed = true;
         }
+        if(!persp_cache || putcamera_changed || persp_changed || ortho_changed){
+            persp_cache = ortho_matrix_cache.value() * persp_matrix_cache.value() * putcamera_matrix_cache.value();
+        }
 
-        //update viewport_matrix_cache
-        bool viewport_changed = false;
-        bool scale_changed = false;
-        if(!viewport_matrix_cache || w != this->w || h != this->h){
+        //update fisheyeviewport_matrix_cache
+        if(!fisheyeviewport_matrix_cache || w != this->w || h != this->h || !equal(fovY, this->fovY)){
             this->w = w;
             this->h = h;
-            Eigen::Matrix4f ViewPort;
+            this->fovY = fovY;
+            Eigen::Matrix4f Scale;
+            float p = fovY / 2;
+            float v = p * w / h;
             float half_w = w / 2.0;
             float half_h = h / 2.0;
-            ViewPort << half_w, 0, 0, half_w,
-                0, -half_h, 0, half_h,
+            Scale << (half_w / std::sin(v)), 0, 0, half_w,
+                0, (-half_h / std::sin(p)), 0, half_h,
                 0, 0, 1, 0,
                 0, 0, 0, 1;
-            viewport_matrix_cache = ViewPort;
-            viewport_changed = true;
-        }
-        float p = fovY / 2;
-        float v = p * w / h;
-        if(!scaleviewport_matrix_cache || viewport_changed || !equal(fovY, this->fovY) || !equal(near, this->near)){
-            this->fovY = fovY;
-            this->near = near;
-            Eigen::Matrix4f Scale;
-            Scale << (1 / (near * std::tan(p))), 0, 0, 0,
-                0, (1 / (near * std::tan(v))), 0, 0,
-                0, 0, 1, 0,
-                0, 0, 0, 1;
-            scaleviewport_matrix_cache = viewport_matrix_cache.value() * Scale;
-            scale_changed = true;
-        }
-        if(!fisheyeviewport_matrix_cache || viewport_changed || !equal(fovY, this->fovY)){
-            this->fovY = fovY;
-            Eigen::Matrix4f Scale;
-            Scale << (1 / std::sin(p)), 0, 0, 0,
-                0, (1 / std::sin(v)), 0, 0,
-                0, 0, 1, 0,
-                0, 0, 0, 1;
-            scaleviewport_matrix_cache = viewport_matrix_cache.value() * Scale;
+            fisheyeviewport_matrix_cache = Scale;
         }
 
-        //update main matrices
-        if(!ortho_cache || putcamera_changed || scale_changed){
-            ortho_cache = scaleviewport_matrix_cache.value() * putcamera_matrix_cache.value();
-        }
-        if(!persp_cache || putcamera_changed || persp_changed || scale_changed){
-            persp_cache = scaleviewport_matrix_cache.value() * persp_matrix_cache.value() * putcamera_matrix_cache.value();
-        }
     }
     void config(float fovY, Eigen::Vector3f position, Eigen::Vector3f lookat_g){
         config(this->projection_type, this->image_color, this->w, this->h, this->fovY, position, lookat_g);
@@ -227,18 +225,30 @@ public:
         Eigen::Vector4f point_position_h = point_position.homogeneous();
         switch(this->projection_type){
         case Projection::ORTHO:
-            point_position_h = ortho_cache.value() * point_position_h;
+            try{
+                point_position_h = ortho_cache.value() * point_position_h;
+            }
+            catch(const std::bad_optional_access& e){ throw "ortho_cache empty"; }
             break;
         case Projection::PERSP:
-            point_position_h = persp_cache.value() * point_position_h;
+            try{
+                point_position_h = persp_cache.value() * point_position_h;
+            }
+            catch(const std::bad_optional_access& e){ throw "persp_cache empty"; }
             break;
 
         default: // FISHEYE
-            point_position_h = putcamera_matrix_cache.value() * point_position_h;
+            try{
+                point_position_h = putcamera_matrix_cache.value() * point_position_h;
+            }
+            catch(const std::bad_optional_access& e){ throw "putcamera_matrix_cache empty"; }
             float dist_i = 1 / point_position_h.hnormalized().norm();
             point_position_h[0] *= dist_i;
             point_position_h[1] *= dist_i;
-            point_position_h = fisheyeviewport_matrix_cache.value() * point_position_h;
+            try{
+                point_position_h = fisheyeviewport_matrix_cache.value() * point_position_h;
+            }
+            catch(const std::bad_optional_access& e){ throw "fisheyeviewport_matrix_cache empty"; }
             break;
         }
         point_position = point_position_h.hnormalized();
@@ -283,13 +293,14 @@ public:
         for(;leftp[dim] < rightp[dim];leftp += i){
             float* pixel_ptr = this->camera.get_top_buff(leftp);
             if(pixel_ptr){
+                float col = 1;//- leftp[2];
                 if(this->camera.image_color == Raster::ImageColor::BLACKWHITE){
-                    pixel_ptr[0] = 1;
+                    pixel_ptr[0] = col;
                 }
                 else{
-                    pixel_ptr[0] = 1;
-                    pixel_ptr[1] = 1;
-                    pixel_ptr[2] = 1;
+                    pixel_ptr[0] = col;
+                    pixel_ptr[1] = col;
+                    pixel_ptr[2] = col;
                 }
             }
         }

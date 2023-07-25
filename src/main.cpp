@@ -31,10 +31,6 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
         std::string suffix = ".png";
         cv::imwrite(path + filename.value() + suffix, image);
     }
-    // while(key != 27){
-    //     cv::imshow("image", image);
-    //     key = cv::waitKey(0);
-    // }
     cv::imshow("image", image);
     cv::waitKey(0);
 }
@@ -42,11 +38,11 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
 int main(){
     Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj",Raster::ImageColor::BLACKWHITE,500,400);
     std::cout << "load complete" << std::endl;
-    Eigen::Vector3f position(0,0,1);
-    Eigen::Vector3f direction(0,0,-1);
-    rasterizer.camera.config(Raster::Camera::Projection::PERSP,Raster::ImageColor::BLACKWHITE,500,400,PI/2,position,direction);
+    Eigen::Vector3f position(1,0,0);
+    Eigen::Vector3f direction(-1,0,0);
+    rasterizer.camera.config(Raster::Camera::Projection::FISHEYE,Raster::ImageColor::BLACKWHITE,500,400,PI/2,position,direction);
     std::cout << "rendering" << std::endl;
-    rasterizer.paint_frame_simple();
+    rasterizer.paint_frame_simple(true);
     std::cout << std::endl << "showing image" << std::endl;
     show_image(rasterizer);
     return 0;
