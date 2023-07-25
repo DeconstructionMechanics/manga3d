@@ -31,10 +31,12 @@ public:
         PERSP,
         FISHEYE
     };
+
     Projection projection_type;
     Raster::ImageColor image_color;
     int w;
     int h;
+private:
     float fovY;
     Eigen::Vector3f position;
     Eigen::Vector3f lookat_g; // must be normalized()
@@ -42,8 +44,14 @@ public:
     float near;
     float far;
 
+    float* z_buff;
+public:
     float* top_buff;
 
+    /*
+    buffers are allocated on the heap
+    use `delete_buff()` to delete them
+    */
     void alloc_buff(){
         if(image_color == Raster::ImageColor::FULLCOLOR){
             top_buff = new float[w * h * 3];
@@ -51,9 +59,11 @@ public:
         else{
             top_buff = new float[w * h];
         }
+        z_buff = new float[w * h];
     }
     void delete_buff(){
         delete[] top_buff;
+        delete[] z_buff;
     }
     Camera(Raster::ImageColor image_color, int w, int h): image_color(image_color), w(w), h(h){
         alloc_buff();
@@ -62,6 +72,21 @@ public:
         delete_buff();
     }
 
+    float* get_top_buff(Eigen::Vector3f ind){
+        if(top_buff == NULL){
+            return nullptr;
+        }
+        if(ind[0] < 0 || ind[0] >= this->w || ind[1] < 0 || ind[1] >= this->h || ind[2] > 0){
+            return nullptr;
+        }
+        int index = (int)ind[0] + (int)ind[1] * this->w;
+        if(this->image_color == Raster::ImageColor::FULLCOLOR){
+            index *= 3;
+        }
+        return &(top_buff[index]);
+    }
+
+private:
     std::optional<Eigen::Matrix4f> movecamera_matrix_cache; //position
     std::optional<Eigen::Matrix4f> rotatecamera_matrix_cache; //lookat_g
     std::optional<Eigen::Matrix4f> upcamera_matrix_cache; //up_t
@@ -76,8 +101,8 @@ public:
     std::optional<Eigen::Matrix4f> ortho_cache; //putcamera_matrix_cache scaleviewport_matrix_cache
     std::optional<Eigen::Matrix4f> persp_cache; //putcamera_matrix_cache persp_matrix_cache scaleviewport_matrix_cache
 
-
-    void config(Projection projection_type, Raster::ImageColor image_color, int w, int h, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat_g, float up_t, float near, float far){
+public:
+    void config(Projection projection_type, Raster::ImageColor image_color, int w, int h, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat_g, float up_t = 0, float near = 0.0001, float far = 10000){
         this->projection_type = projection_type;
         if(this->image_color != image_color || this->w != w || this->h != h){
             delete_buff();
@@ -195,7 +220,7 @@ public:
         }
     }
     void config(float fovY, Eigen::Vector3f position, Eigen::Vector3f lookat_g){
-        config(this->projection_type,this->image_color,this->w,this->h,this->fovY,position,lookat_g,0,this->near,this->far);
+        config(this->projection_type, this->image_color, this->w, this->h, this->fovY, position, lookat_g);
     }
 
     void projection(Eigen::Vector3f& point_position){
@@ -239,4 +264,51 @@ public:
         obj_deletor(vertices, edges, triangles);
     }
 
+    void paint_line_simple(Eigen::Vector3f a, Eigen::Vector3f b){
+        int dim = 0;
+        if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
+            dim = 1;
+        };
+        Eigen::Vector3f leftp;
+        Eigen::Vector3f rightp;
+        if(a[dim] < b[dim]){
+            leftp = a;
+            rightp = b;
+        }
+        else{
+            leftp = b;
+            rightp = a;
+        }
+        Eigen::Vector3f i = (rightp - leftp).normalized();
+        for(;leftp[dim] < rightp[dim];leftp += i){
+            float* pixel_ptr = this->camera.get_top_buff(leftp);
+            if(pixel_ptr){
+                if(this->camera.image_color == Raster::ImageColor::BLACKWHITE){
+                    pixel_ptr[0] = 1;
+                }
+                else{
+                    pixel_ptr[0] = 1;
+                    pixel_ptr[1] = 1;
+                    pixel_ptr[2] = 1;
+                }
+            }
+        }
+    }
+    void paint_frame_simple(bool verbose = false){
+        int i = 0;
+        for(Obj::Edge* edge : this->edges){
+            Eigen::Vector3f start = edge->start->position;
+            Eigen::Vector3f end = edge->end->position;
+            camera.projection(start);
+            camera.projection(end);
+            paint_line_simple(start, end);
+            if(verbose){
+                i++;
+                if(i % 10 == 0){
+                    std::cout << i << "/" << this->edges.size() << " paint_frame_simple()%\r";
+                    std::cout.flush();
+                }
+            }
+        }
+    }
 };

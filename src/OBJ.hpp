@@ -90,7 +90,10 @@ namespace ObjFile{
     };
 }
 
-/*vertex_list,edge_list,triangle_list have elements allocated on the heap */
+/*
+vertex_list,edge_list,triangle_list have elements allocated on the heap
+use `obj_deletor()` to delete them
+*/
 void obj_loader(std::vector<Obj::Vertex*>& vertex_list, std::vector<Obj::Edge*>& edge_list, std::vector<Obj::Triangle*>& triangle_list, const std::string obj_path){
     using namespace ObjFile;
 
