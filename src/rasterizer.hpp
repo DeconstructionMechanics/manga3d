@@ -14,6 +14,11 @@ namespace Raster{
     };
 }
 
+
+
+
+
+
 class Raster::Light{
 public:
     float I;
@@ -23,6 +28,11 @@ public:
 class Raster::PointLight: public Raster::Light{
 
 };
+
+
+
+
+
 
 class Raster::Camera{
 public:
@@ -72,18 +82,57 @@ public:
         delete_buff();
     }
 
-    float* get_top_buff(Eigen::Vector3f ind){
-        if(top_buff == NULL){
+    void init_buffs(Eigen::Vector3f bg_color){ //bg_color[1] => green => BLACKWHITE
+        int wh = w * h;
+        for(int i = 0;i < wh;i++){
+            z_buff[i] = MAX_F;
+            if(this->image_color == Raster::ImageColor::FULLCOLOR){
+                top_buff[3*i] = bg_color[0];
+                top_buff[3*i + 1] = bg_color[1];
+                top_buff[3*i + 2] = bg_color[2];
+            }
+            else{
+                top_buff[i] = bg_color[1];
+            }
+        }
+    }
+
+    inline float* get_buff(Eigen::Vector3f ind, float* buff){
+        if(top_buff == NULL || ind[2] > 0){
             return nullptr;
         }
-        if(ind[0] < 0 || ind[0] >= this->w || ind[1] < 0 || ind[1] >= this->h || ind[2] > 0){
+        return get_buff((int)ind[0], (int)ind[1],buff);
+    }
+    inline float* get_buff(int x, int y, float* buff){
+        if(x < 0 || x >= this->w || y < 0 || y >= this->w){
             return nullptr;
         }
-        int index = (int)ind[0] + (int)ind[1] * this->w;
+        return get_buff_trust(x,y,buff);
+    }
+    inline float* get_buff_trust(int x, int y, float* buff){
+        int index = x + y * this->w;
         if(this->image_color == Raster::ImageColor::FULLCOLOR){
             index *= 3;
         }
-        return &(top_buff[index]);
+        return &(buff[index]);
+    }
+    inline float* get_top_buff(Eigen::Vector3f ind){
+        return get_buff((int)ind[0], (int)ind[1], this->top_buff);
+    }
+    inline float* get_top_buff(int x, int y){
+        return get_buff_trust(x,y, this->top_buff);
+    }
+    inline float* get_top_buff_trust(int x, int y){
+        return get_buff_trust(x,y,this->top_buff);
+    }
+    inline float* get_z_buff(Eigen::Vector3f ind){
+        return get_buff((int)ind[0], (int)ind[1], this->z_buff);
+    }
+    inline float* get_z_buff(int x, int y){
+        return get_buff_trust(x,y, this->z_buff);
+    }
+    inline float* get_z_buff_trust(int x, int y){
+        return get_buff_trust(x,y,this->z_buff);
     }
 
 private:
@@ -256,6 +305,10 @@ public:
 
 };
 
+
+
+
+
 class Raster::Rasterizer{
 public:
 
@@ -274,7 +327,7 @@ public:
         obj_deletor(vertices, edges, triangles);
     }
 
-    void paint_line_simple(Eigen::Vector3f a, Eigen::Vector3f b){
+    void paint_line_simple(Eigen::Vector3f a, Eigen::Vector3f b, Eigen::Vector3f color = Eigen::Vector3f(0,0,0)){
         int dim = 0;
         if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
             dim = 1;
@@ -293,19 +346,19 @@ public:
         for(;leftp[dim] < rightp[dim];leftp += i){
             float* pixel_ptr = this->camera.get_top_buff(leftp);
             if(pixel_ptr){
-                float col = 1;//- leftp[2];
                 if(this->camera.image_color == Raster::ImageColor::BLACKWHITE){
-                    pixel_ptr[0] = col;
+                    pixel_ptr[0] = color[1];
                 }
                 else{
-                    pixel_ptr[0] = col;
-                    pixel_ptr[1] = col;
-                    pixel_ptr[2] = col;
+                    pixel_ptr[0] = color[0];
+                    pixel_ptr[1] = color[1];
+                    pixel_ptr[2] = color[2];
                 }
             }
         }
     }
     void paint_frame_simple(bool verbose = false){
+        camera.init_buffs(Eigen::Vector3f(1,1,1));
         int i = 0;
         for(Obj::Edge* edge : this->edges){
             Eigen::Vector3f start = edge->start->position;
