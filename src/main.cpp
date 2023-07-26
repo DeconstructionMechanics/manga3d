@@ -36,14 +36,19 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
 }
 
 int main(){
-    Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj",Raster::ImageColor::BLACKWHITE,6000,4000);
-    std::cout << "load complete" << std::endl;
-    Eigen::Vector3f position(1.5,0,0);
-    Eigen::Vector3f lookat(-1,0,0);
-    rasterizer.camera.config(Raster::Camera::Projection::PERSP,Raster::ImageColor::BLACKWHITE,6000,4000,PI/2,position,lookat);
-    std::cout << "rendering" << std::endl;
-    rasterizer.paint_frame_simple(true);
-    std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer,"frame");
+    try{
+        Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj");
+        std::cout << "load complete" << std::endl;
+        Eigen::Vector3f position(1.5, 0, 0);
+        Eigen::Vector3f lookat(-1, 0, 0);
+        rasterizer.camera.config(Raster::Camera::Projection::PERSP, Raster::ImageColor::BLACKWHITE, 600, 400, PI / 2, position, lookat);
+        std::cout << "rendering" << std::endl;
+        rasterizer.paint_frame_simple(true);
+        std::cout << std::endl << "showing image" << std::endl;
+        show_image(rasterizer, "frame");
+    }
+    catch(const char* e){
+        std::cout << e << std::endl;
+    }
     return 0;
 }

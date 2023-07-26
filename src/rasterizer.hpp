@@ -62,20 +62,44 @@ public:
     buffers are allocated on the heap
     use `delete_buff()` to delete them
     */
-    void alloc_buff(){
+    inline void alloc_buff(){
+        if(z_buff){
+            throw "Raster::Camera::alloc_buff(): memory leak z_buff";
+        }
+        z_buff = new float[w * h];
+
+        if(top_buff){
+            throw "Raster::Camera::alloc_buff(): memory leak top_buff";
+        }
+        if(w <= 0 || h <= 0){
+            throw "Raster::Camera::alloc_buff(): illegal w,h";
+        }
         if(image_color == Raster::ImageColor::FULLCOLOR){
             top_buff = new float[w * h * 3];
         }
         else{
             top_buff = new float[w * h];
         }
-        z_buff = new float[w * h];
     }
-    void delete_buff(){
-        delete[] top_buff;
-        delete[] z_buff;
+    inline void delete_buff(){
+        if(z_buff){
+            delete[] z_buff;
+        }
+        if(top_buff){
+            delete[] top_buff;
+        }
+        clear_buff();
+    }
+    inline void clear_buff(){
+        z_buff = nullptr;
+        top_buff = nullptr;
+    }
+    Camera(): image_color(Raster::ImageColor::BLACKWHITE), w(1), h(1){
+        clear_buff();
+        alloc_buff();
     }
     Camera(Raster::ImageColor image_color, int w, int h): image_color(image_color), w(w), h(h){
+        clear_buff();
         alloc_buff();
     }
     ~Camera(){
@@ -87,9 +111,9 @@ public:
         for(int i = 0;i < wh;i++){
             z_buff[i] = MAX_F;
             if(this->image_color == Raster::ImageColor::FULLCOLOR){
-                top_buff[3*i] = bg_color[0];
-                top_buff[3*i + 1] = bg_color[1];
-                top_buff[3*i + 2] = bg_color[2];
+                top_buff[3 * i] = bg_color[0];
+                top_buff[3 * i + 1] = bg_color[1];
+                top_buff[3 * i + 2] = bg_color[2];
             }
             else{
                 top_buff[i] = bg_color[1];
@@ -97,42 +121,42 @@ public:
         }
     }
 
-    inline float* get_buff(Eigen::Vector3f ind, float* buff){
+    inline float* get_buff(Eigen::Vector3f ind, float* buff) const{
         if(top_buff == NULL || ind[2] > 0){
             return nullptr;
         }
-        return get_buff((int)ind[0], (int)ind[1],buff);
+        return get_buff((int)ind[0], (int)ind[1], buff);
     }
-    inline float* get_buff(int x, int y, float* buff){
+    inline float* get_buff(int x, int y, float* buff) const{
         if(x < 0 || x >= this->w || y < 0 || y >= this->w){
             return nullptr;
         }
-        return get_buff_trust(x,y,buff);
+        return get_buff_trust(x, y, buff);
     }
-    inline float* get_buff_trust(int x, int y, float* buff){
+    inline float* get_buff_trust(int x, int y, float* buff) const{
         int index = x + y * this->w;
         if(this->image_color == Raster::ImageColor::FULLCOLOR){
             index *= 3;
         }
         return &(buff[index]);
     }
-    inline float* get_top_buff(Eigen::Vector3f ind){
+    inline float* get_top_buff(Eigen::Vector3f ind) const{
         return get_buff((int)ind[0], (int)ind[1], this->top_buff);
     }
-    inline float* get_top_buff(int x, int y){
-        return get_buff_trust(x,y, this->top_buff);
+    inline float* get_top_buff(int x, int y) const{
+        return get_buff(x, y, this->top_buff);
     }
-    inline float* get_top_buff_trust(int x, int y){
-        return get_buff_trust(x,y,this->top_buff);
+    inline float* get_top_buff_trust(int x, int y) const{
+        return get_buff_trust(x, y, this->top_buff);
     }
-    inline float* get_z_buff(Eigen::Vector3f ind){
+    inline float* get_z_buff(Eigen::Vector3f ind) const{
         return get_buff((int)ind[0], (int)ind[1], this->z_buff);
     }
-    inline float* get_z_buff(int x, int y){
-        return get_buff_trust(x,y, this->z_buff);
+    inline float* get_z_buff(int x, int y) const{
+        return get_buff(x, y, this->z_buff);
     }
-    inline float* get_z_buff_trust(int x, int y){
-        return get_buff_trust(x,y,this->z_buff);
+    inline float* get_z_buff_trust(int x, int y) const{
+        return get_buff_trust(x, y, this->z_buff);
     }
 
 private:
@@ -266,38 +290,46 @@ public:
         }
 
     }
-    void config(float fovY, Eigen::Vector3f position, Eigen::Vector3f lookat_g){
+    inline void config(float fovY, Eigen::Vector3f position, Eigen::Vector3f lookat_g){
         config(this->projection_type, this->image_color, this->w, this->h, this->fovY, position, lookat_g);
     }
 
-    void projection(Eigen::Vector3f& point_position){
+    void projection(Eigen::Vector3f& point_position) const{
         Eigen::Vector4f point_position_h = point_position.homogeneous();
         switch(this->projection_type){
         case Projection::ORTHO:
             try{
                 point_position_h = ortho_cache.value() * point_position_h;
             }
-            catch(const std::bad_optional_access& e){ throw "ortho_cache empty"; }
+            catch(const std::bad_optional_access& e){
+                throw "Raster::Camera::projection(): ortho_cache empty";
+            }
             break;
         case Projection::PERSP:
             try{
                 point_position_h = persp_cache.value() * point_position_h;
             }
-            catch(const std::bad_optional_access& e){ throw "persp_cache empty"; }
+            catch(const std::bad_optional_access& e){
+                throw "Raster::Camera::projection(): persp_cache empty";
+            }
             break;
 
         default: // FISHEYE
             try{
                 point_position_h = putcamera_matrix_cache.value() * point_position_h;
             }
-            catch(const std::bad_optional_access& e){ throw "putcamera_matrix_cache empty"; }
+            catch(const std::bad_optional_access& e){
+                throw "Raster::Camera::projection(): putcamera_matrix_cache empty";
+            }
             float dist_i = 1 / point_position_h.hnormalized().norm();
             point_position_h[0] *= dist_i;
             point_position_h[1] *= dist_i;
             try{
                 point_position_h = fisheyeviewport_matrix_cache.value() * point_position_h;
             }
-            catch(const std::bad_optional_access& e){ throw "fisheyeviewport_matrix_cache empty"; }
+            catch(const std::bad_optional_access& e){
+                throw "Raster::Camera::projection(): fisheyeviewport_matrix_cache empty";
+            }
             break;
         }
         point_position = point_position_h.hnormalized();
@@ -319,15 +351,42 @@ public:
     std::vector<Raster::Light> lights;
     Raster::Camera camera;
 
-    Rasterizer(Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){}
-    Rasterizer(const std::string obj_path, Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){
+    Eigen::Vector3f bg_color;
+
+    inline void load_obj(const std::string obj_path){
         obj_loader(vertices, edges, triangles, obj_path);
     }
+    inline void delete_obj(){
+        obj_deletor(vertices, edges, triangles);;
+    }
+    Rasterizer(Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){}
+    Rasterizer(const std::string obj_path, Eigen::Vector3f bg_color = Eigen::Vector3f(1, 1, 1)): bg_color(bg_color){
+        load_obj(obj_path);
+    }
+    Rasterizer(const std::string obj_path, Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){
+        load_obj(obj_path);
+    }
     ~Rasterizer(){
-        obj_deletor(vertices, edges, triangles);
+        delete_obj();
     }
 
-    void paint_line_simple(Eigen::Vector3f a, Eigen::Vector3f b, Eigen::Vector3f color = Eigen::Vector3f(0,0,0)){
+    void project_vertices(bool verbose = false){
+        int i = 0;
+        for(Obj::Vertex* vertex : this->vertices){
+            camera.projection(vertex->position);
+            if(verbose){
+                i++;
+                if(i % 100 == 0){
+                    print_progress(i, this->vertices.size(), "Project vertex");
+                }
+            }
+        }
+        if(verbose){
+            std::cout << "End project vertex" << std::endl;
+        }
+    }
+
+    void paint_line_simple(Eigen::Vector3f a, Eigen::Vector3f b, Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0)){
         int dim = 0;
         if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
             dim = 1;
@@ -358,19 +417,86 @@ public:
         }
     }
     void paint_frame_simple(bool verbose = false){
-        camera.init_buffs(Eigen::Vector3f(1,1,1));
+        camera.init_buffs(bg_color);
         int i = 0;
+        project_vertices(verbose);
         for(Obj::Edge* edge : this->edges){
-            Eigen::Vector3f start = edge->start->position;
-            Eigen::Vector3f end = edge->end->position;
-            camera.projection(start);
-            camera.projection(end);
-            paint_line_simple(start, end);
+            paint_line_simple(edge->start->position, edge->end->position);
             if(verbose){
                 i++;
-                if(i % 10 == 0){
-                    std::cout << i << "/" << this->edges.size() << " paint_frame_simple()%\r";
-                    std::cout.flush();
+                if(i % 100 == 0){
+                    print_progress(i, this->edges.size(), "Paint pixels");
+                }
+            }
+        }
+        if(verbose){
+            std::cout << "End paint_frame_simple()" << std::endl;
+        }
+    }
+    void paint_outline_simple(Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0),bool verbose = false){
+        camera.init_buffs(bg_color);
+        int i = 0;
+        project_vertices(verbose);
+        for(Obj::Triangle* triangle : this->triangles){
+            triangle->calculate_normal();
+        }
+        for(Obj::Triangle* triangle : this->triangles){
+            if(triangle->normal.value().z() < 0){
+                continue;
+            }
+            if(triangle->A->position[2] > 0 && triangle->B->position[2] > 0 && triangle->C->position[2] > 0){
+                continue;
+            }
+            float l, r, u, d;
+            l = min(triangle->A->position[0], triangle->B->position[0], triangle->C->position[0]) - 1;
+            r = max(triangle->A->position[0], triangle->B->position[0], triangle->C->position[0]) + 1;
+            u = min(triangle->A->position[1], triangle->B->position[1], triangle->C->position[1]) - 1;
+            d = max(triangle->A->position[1], triangle->B->position[1], triangle->C->position[1]) + 1;
+            maximize(l, 0);
+            minimize(r, camera.w - 0.9);
+            maximize(u, 0);
+            minimize(d, camera.h - 0.9);
+            for(int x = l;x < r;x++){
+                for(int y = u;y < d;y++){
+                    if(triangle->is_inside_triangle(x, y)){
+                        Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
+                        float z = bc_coord.dot(Eigen::Vector3f(triangle->A->position[2], triangle->B->position[2], triangle->C->position[2]));
+                        if(z > 0){
+                            continue;
+                        }
+                        float* z_p = camera.get_z_buff_trust(x, y);
+                        if(z > *z_p){
+                            *z_p = z;
+
+                            bool outline = false;
+                            float max_dist_boundary = 1.5;
+                            float max_crease_boundary = 1;
+                            float crease_angle = 2;
+                            truify(outline,((triangle->AB->is_boundary() || triangle->AB->is_silhouette()) && triangle->AB->point_distance_2d(x,y) < max_dist_boundary));
+                            truify(outline,((triangle->AB->is_crease(crease_angle)) && triangle->AB->point_distance_2d(x,y) < max_crease_boundary));
+                            truify(outline,((triangle->BC->is_boundary() || triangle->BC->is_silhouette()) && triangle->BC->point_distance_2d(x,y) < max_dist_boundary));
+                            truify(outline,((triangle->BC->is_crease(crease_angle)) && triangle->BC->point_distance_2d(x,y) < max_crease_boundary));
+                            truify(outline,((triangle->CA->is_boundary() || triangle->CA->is_silhouette()) && triangle->CA->point_distance_2d(x,y) < max_dist_boundary));
+                            truify(outline,((triangle->CA->is_crease(crease_angle)) && triangle->CA->point_distance_2d(x,y) < max_crease_boundary));
+                            
+                            Eigen::Vector3f this_color;
+                            if(outline){
+                                this_color = color;
+                            }
+                            else{
+                                this_color = bg_color;
+                            }
+                            float* top_p = camera.get_top_buff_trust(x, y);
+                            if(camera.image_color == Raster::ImageColor::BLACKWHITE){
+                                *top_p = this_color[1];
+                            }
+                            else{
+                                top_p[0] = this_color[0];
+                                top_p[1] = this_color[1];
+                                top_p[2] = this_color[2];
+                            }
+                        }
+                    }
                 }
             }
         }

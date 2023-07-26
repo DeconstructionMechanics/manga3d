@@ -86,3 +86,19 @@ inline const bool equal(const float a,const float b){
 inline const bool iszero(const float a){
     return ((0 < a && a < EPSILON) || (0 < - a && - a < EPSILON));
 }
+
+inline void truify(bool& to_change,bool condition){
+    if(condition){
+        to_change = true;
+    }
+}
+inline void falsify(bool& to_change,bool condition){
+    if(!condition){
+        to_change = false;
+    }
+}
+
+inline void print_progress(const int i,const int total,const std::string message){
+    std::cout.flush();
+    std::cout << message << ": " << i << "/" << total << "\r";
+}

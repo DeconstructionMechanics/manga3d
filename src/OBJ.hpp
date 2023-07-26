@@ -26,6 +26,41 @@ namespace Obj{
         Vertex* end;
         Triangle* triangle;
         Edge* reverse;
+
+        Edge(): start(nullptr), end(nullptr), triangle(nullptr), reverse(nullptr){}
+
+        float point_distance_2d(int x, int y){
+            float Y = start->position[1] - end->position[1];
+            float X = end->position[0] - start->position[0];
+            return (std::abs(Y * x + X * y + start->position[0] * end->position[1] - end->position[0] * start->position[1]) / std::sqrt(X * X + Y * Y));
+        }
+
+        bool is_boundary(){
+            return reverse == NULL;
+        }
+        bool is_crease(float angle){
+            if(reverse == NULL){
+                return false;
+            }
+            try{
+                float cost = this->triangle->normal.value().dot(this->reverse->triangle->normal.value());
+                return cost < std::cos(angle);
+            }
+            catch(const std::bad_optional_access& e){
+                throw "triangle->normal is not calculated";
+            }
+        }
+        bool is_silhouette(){
+            try{
+                if(this->triangle->normal.value()[2] > 0 && this->reverse->triangle->normal.value()[2] < 0){
+                    return true;
+                }
+                return false;
+            }
+            catch(const std::bad_optional_access& e){
+                throw "triangle->normal is not calculated";
+            }
+        }
     };
 
     class Triangle{
@@ -43,6 +78,33 @@ namespace Obj{
         Edge* BC;
         Edge* CA;
         std::optional<Vector3f> normal;
+
+        Triangle(): A(nullptr), B(nullptr), C(nullptr), AB(nullptr), BC(nullptr), CA(nullptr){};
+
+        inline void calculate_normal(){
+            this->normal = (this->B->position - this->A->position).cross(this->A->position - this->C->position).normalized();
+        }
+        inline bool is_inside_triangle(int x, int y) const{
+            float ax, ay, bx, by, cx, cy;
+            ax = this->A->position[0] - x;
+            ay = this->A->position[1] - y;
+            bx = this->B->position[0] - x;
+            by = this->B->position[1] - y;
+            cx = this->C->position[0] - x;
+            cy = this->C->position[1] - y;
+            float v0, v1, v2;
+            v0 = ax * by - ay * bx;
+            v1 = bx * cy - by * cx;
+            v2 = cx * ay - cy * ax;
+            return v0 > 0 && v1 > 0 && v2 > 0;
+        }
+        Vector3f get_barycentric_coordinate(int x, int y) const{
+            float alpha, beta, gama;
+            alpha = (-(x - this->B->position[0]) * (this->C->position[1] - this->B->position[1]) + (y - this->B->position[1]) * (this->C->position[0] - this->B->position[0])) / (-(this->A->position[0] - this->B->position[0]) * (this->C->position[1] - this->B->position[1]) + (this->A->position[1] - this->B->position[1]) * (this->C->position[0] - this->B->position[0]));
+            beta = (-(x - this->C->position[0]) * (this->A->position[1] - this->C->position[1]) + (y - this->C->position[1]) * (this->A->position[0] - this->C->position[0])) / (-(this->B->position[0] - this->C->position[0]) * (this->A->position[1] - this->C->position[1]) + (this->B->position[1] - this->C->position[1]) * (this->A->position[0] - this->C->position[0]));
+            gama = 1 - alpha - beta;
+            return Vector3f(alpha, beta, gama);
+        }
     };
 
     class Ray{
@@ -55,7 +117,7 @@ namespace Obj{
         std::optional<Vector3f> direction;
         std::optional<float> t;
         std::optional<Vector3f> end;
-        Ray(Express express,Vector3f& origin,Vector3f& b) : origin(origin) {
+        Ray(Express express, Vector3f& origin, Vector3f& b): origin(origin){
             if(express == Express::DIRECTION){
                 direction = b;
             }
@@ -94,7 +156,7 @@ namespace ObjFile{
 vertex_list,edge_list,triangle_list have elements allocated on the heap
 use `obj_deletor()` to delete them
 */
-void obj_loader(std::vector<Obj::Vertex*>& vertex_list, std::vector<Obj::Edge*>& edge_list, std::vector<Obj::Triangle*>& triangle_list, const std::string obj_path){
+void obj_loader(std::vector<Obj::Vertex*>& vertices, std::vector<Obj::Edge*>& edges, std::vector<Obj::Triangle*>& triangles, const std::string obj_path){
     using namespace ObjFile;
 
     std::vector<v> raw_v;
@@ -153,6 +215,10 @@ void obj_loader(std::vector<Obj::Vertex*>& vertex_list, std::vector<Obj::Edge*>&
             }
         }
         file.close(); // Close the OBJ file
+
+        std::vector<Obj::Vertex*> vertex_list;
+        std::vector<Obj::Edge*> edge_list;
+        std::vector<Obj::Triangle*> triangle_list;
 
         for(const v& _v : raw_v){
             Obj::Vertex* vertex = new Obj::Vertex();
@@ -219,20 +285,32 @@ void obj_loader(std::vector<Obj::Vertex*>& vertex_list, std::vector<Obj::Edge*>&
                 }
             }
         }
+        vertices.insert(vertices.end(), vertex_list.begin(), vertex_list.end());
+        edges.insert(edges.end(), edge_list.begin(), edge_list.end());
+        triangles.insert(triangles.end(), triangle_list.begin(), triangle_list.end());
     } // otherwise, file is not opened
 }
 
 void obj_deletor(std::vector<Obj::Vertex*>& vertex_list, std::vector<Obj::Edge*>& edge_list, std::vector<Obj::Triangle*>& triangle_list){
     for(int i = 0;i < vertex_list.size();i++){
-        delete vertex_list[i];
+        if(vertex_list[i]){
+            delete vertex_list[i];
+            vertex_list[i] = nullptr;
+        }
     }
     vertex_list.clear();
     for(int i = 0;i < edge_list.size();i++){
-        delete edge_list[i];
+        if(edge_list[i]){
+            delete edge_list[i];
+            edge_list[i] = nullptr;
+        }
     }
     edge_list.clear();
     for(int i = 0;i < triangle_list.size();i++){
-        delete triangle_list[i];
+        if(triangle_list[i]){
+            delete triangle_list[i];
+            triangle_list[i] = nullptr;
+        }
     }
     triangle_list.clear();
 }
