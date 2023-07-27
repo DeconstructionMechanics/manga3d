@@ -29,38 +29,17 @@ namespace Obj{
 
         Edge(): start(nullptr), end(nullptr), triangle(nullptr), reverse(nullptr){}
 
-        float point_distance_2d(int x, int y){
+        float point_distance_2d(int x, int y) const{
             float Y = start->position[1] - end->position[1];
             float X = end->position[0] - start->position[0];
             return (std::abs(Y * x + X * y + start->position[0] * end->position[1] - end->position[0] * start->position[1]) / std::sqrt(X * X + Y * Y));
         }
 
-        bool is_boundary(){
+        bool is_boundary() const{
             return reverse == NULL;
         }
-        bool is_crease(float angle){
-            if(reverse == NULL){
-                return false;
-            }
-            try{
-                float cost = this->triangle->normal.value().dot(this->reverse->triangle->normal.value());
-                return cost < std::cos(angle);
-            }
-            catch(const std::bad_optional_access& e){
-                throw "triangle->normal is not calculated";
-            }
-        }
-        bool is_silhouette(){
-            try{
-                if(this->triangle->normal.value()[2] > 0 && this->reverse->triangle->normal.value()[2] < 0){
-                    return true;
-                }
-                return false;
-            }
-            catch(const std::bad_optional_access& e){
-                throw "triangle->normal is not calculated";
-            }
-        }
+        bool is_crease(float angle) const;
+        bool is_silhouette() const;
     };
 
     class Triangle{
@@ -106,6 +85,30 @@ namespace Obj{
             return Vector3f(alpha, beta, gama);
         }
     };
+
+    bool Edge::is_crease(float angle) const{
+        if(reverse == NULL){
+            return false;
+        }
+        try{
+            float cost = this->triangle->normal.value().dot(this->reverse->triangle->normal.value());
+            return cost < std::cos(angle);
+        }
+        catch(const std::bad_optional_access& e){
+            throw Manga3DException("triangle->normal is not calculated", e);
+        }
+    }
+    bool Edge::is_silhouette() const{
+        try{
+            if(this->triangle->normal.value()[2] > 0 && this->reverse->triangle->normal.value()[2] < 0){
+                return true;
+            }
+            return false;
+        }
+        catch(const std::bad_optional_access& e){
+            throw Manga3DException("triangle->normal is not calculated", e);
+        }
+    }
 
     class Ray{
     public:

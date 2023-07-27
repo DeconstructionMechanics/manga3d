@@ -64,15 +64,15 @@ public:
     */
     inline void alloc_buff(){
         if(z_buff){
-            throw "Raster::Camera::alloc_buff(): memory leak z_buff";
+            throw Manga3DException("Raster::Camera::alloc_buff(): memory leak z_buff");
         }
         z_buff = new float[w * h];
 
         if(top_buff){
-            throw "Raster::Camera::alloc_buff(): memory leak top_buff";
+            throw Manga3DException("Raster::Camera::alloc_buff(): memory leak top_buff");
         }
         if(w <= 0 || h <= 0){
-            throw "Raster::Camera::alloc_buff(): illegal w,h";
+            throw Manga3DException("Raster::Camera::alloc_buff(): illegal w,h");
         }
         if(image_color == Raster::ImageColor::FULLCOLOR){
             top_buff = new float[w * h * 3];
@@ -302,7 +302,7 @@ public:
                 point_position_h = ortho_cache.value() * point_position_h;
             }
             catch(const std::bad_optional_access& e){
-                throw "Raster::Camera::projection(): ortho_cache empty";
+                throw Manga3DException("Raster::Camera::projection(): ortho_cache empty");
             }
             break;
         case Projection::PERSP:
@@ -310,7 +310,7 @@ public:
                 point_position_h = persp_cache.value() * point_position_h;
             }
             catch(const std::bad_optional_access& e){
-                throw "Raster::Camera::projection(): persp_cache empty";
+                throw Manga3DException("Raster::Camera::projection(): persp_cache empty");
             }
             break;
 
@@ -319,7 +319,7 @@ public:
                 point_position_h = putcamera_matrix_cache.value() * point_position_h;
             }
             catch(const std::bad_optional_access& e){
-                throw "Raster::Camera::projection(): putcamera_matrix_cache empty";
+                throw Manga3DException("Raster::Camera::projection(): putcamera_matrix_cache empty");
             }
             float dist_i = 1 / point_position_h.hnormalized().norm();
             point_position_h[0] *= dist_i;
@@ -328,7 +328,7 @@ public:
                 point_position_h = fisheyeviewport_matrix_cache.value() * point_position_h;
             }
             catch(const std::bad_optional_access& e){
-                throw "Raster::Camera::projection(): fisheyeviewport_matrix_cache empty";
+                throw Manga3DException("Raster::Camera::projection(): fisheyeviewport_matrix_cache empty");
             }
             break;
         }
@@ -382,7 +382,7 @@ public:
             }
         }
         if(verbose){
-            std::cout << "End project vertex" << std::endl;
+            std::cout << std::endl << "End project vertex" << std::endl;
         }
     }
 
@@ -420,6 +420,7 @@ public:
         camera.init_buffs(bg_color);
         int i = 0;
         project_vertices(verbose);
+
         for(Obj::Edge* edge : this->edges){
             paint_line_simple(edge->start->position, edge->end->position);
             if(verbose){
@@ -430,17 +431,35 @@ public:
             }
         }
         if(verbose){
-            std::cout << "End paint_frame_simple()" << std::endl;
+            std::cout << std::endl << "End paint_frame_simple()" << std::endl;
         }
     }
     void paint_outline_simple(Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0),bool verbose = false){
         camera.init_buffs(bg_color);
         int i = 0;
         project_vertices(verbose);
+
         for(Obj::Triangle* triangle : this->triangles){
             triangle->calculate_normal();
+            if(verbose){
+                i++;
+                if(i % 100 == 0){
+                    print_progress(i, this->triangles.size(),"Triangle normal calculation");
+                }
+            }
         }
+        if(verbose){
+            std::cout << std::endl << "Triangle normal calculated" << std::endl;
+        }
+
+        i = 1;
         for(Obj::Triangle* triangle : this->triangles){
+            if(verbose){
+                i++;
+                if(i % 100 == 0){
+                    print_progress(i, this->triangles.size(),"Triangle rasterizing");
+                }
+            }
             if(triangle->normal.value().z() < 0){
                 continue;
             }
@@ -499,6 +518,9 @@ public:
                     }
                 }
             }
+        }
+        if(verbose){
+            std::cout << std::endl << "End paint_outline_simple()" << std::endl;
         }
     }
 };
