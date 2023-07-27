@@ -5,6 +5,28 @@
 #include <string>
 
 #include "global.hpp"
+#include "texture.hpp"
+
+
+
+namespace ObjFile{
+    struct v{
+        float x, y, z;
+    };
+    struct vt{
+        float u, v;
+    };
+    struct vn{
+        float x, y, z;
+    };
+    struct f{
+        int n_v;
+        int n_p;
+        std::vector<int> index;
+    };
+}
+
+
 
 namespace Obj{
     using namespace Eigen;
@@ -12,6 +34,7 @@ namespace Obj{
     class Vertex;
     class Edge;
     class Triangle;
+    class ObjSet;
 
     class Vertex{
     public:
@@ -75,7 +98,7 @@ namespace Obj{
             v0 = ax * by - ay * bx;
             v1 = bx * cy - by * cx;
             v2 = cx * ay - cy * ax;
-            return v0 > 0 && v1 > 0 && v2 > 0;
+            return v0 < 0 && v1 < 0 && v2 < 0;
         }
         Vector3f get_barycentric_coordinate(int x, int y) const{
             float alpha, beta, gama;
@@ -110,6 +133,169 @@ namespace Obj{
         }
     }
 
+    class ObjSet{
+    public:
+        std::vector<Obj::Vertex*> vertices;
+        std::vector<Obj::Edge*> edges;
+        std::vector<Obj::Triangle*> triangles;
+        Texture texture;
+
+        /*
+        vertex_list,edge_list,triangle_list have elements allocated on the heap
+        use `~ObjSet()` to delete them
+        */
+        ObjSet(const std::string obj_path){
+            std::vector<ObjFile::v> raw_v;
+            std::vector<ObjFile::vt> raw_vt;
+            std::vector<ObjFile::vn> raw_vn;
+            std::vector<ObjFile::f> raw_f;
+
+            std::ifstream file(obj_path);
+            if(file.is_open()){
+                std::string line;
+                while(std::getline(file, line)){
+                    if(line.substr(0, 2) == "v "){
+                        ObjFile::v _v;
+                        sscanf(line.c_str(), "v %f %f %f", &_v.x, &_v.y, &_v.z);
+                        raw_v.push_back(_v);
+                    }
+                    else if(line.substr(0, 3) == "vt "){
+                        ObjFile::vt _vt;
+                        sscanf(line.c_str(), "vt %f %f", &_vt.u, &_vt.v);
+                        raw_vt.push_back(_vt);
+                    }
+                    else if(line.substr(0, 3) == "vn "){
+                        ObjFile::vn _vn;
+                        sscanf(line.c_str(), "vn %f %f %f", &_vn.x, &_vn.y, &_vn.z);
+                        raw_vn.push_back(_vn);
+                    }
+                    else if(line.substr(0, 2) == "f "){
+                        ObjFile::f _f;
+                        _f.n_p = 1;
+                        _f.n_v = 1;
+                        std::vector<char> buffer;
+                        int i = 2;
+                        while(line.c_str()[i] != '\0'){
+                            if(line.c_str()[i] == '/'){
+                                _f.n_p++;
+                                std::string str(buffer.begin(), buffer.end());
+                                buffer.clear();
+                                _f.index.push_back(std::stoi(str));
+                            }
+                            else if(line.c_str()[i] == ' '){
+                                _f.n_p = 1;
+                                _f.n_v++;
+                                std::string str(buffer.begin(), buffer.end());
+                                buffer.clear();
+                                _f.index.push_back(std::stoi(str));
+                            }
+                            else{
+                                buffer.push_back(line.c_str()[i]);
+                            }
+                            i++;
+                        }
+                        std::string str(buffer.begin(), buffer.end());
+                        buffer.clear();
+                        _f.index.push_back(std::stoi(str));
+                        raw_f.push_back(_f);
+                    }
+                }
+                file.close(); // Close the OBJ file
+
+                
+
+                for(const ObjFile::v& _v : raw_v){
+                    Obj::Vertex* vertex = new Obj::Vertex();
+                    vertex->position = Eigen::Vector3f(_v.x, _v.y, _v.z);
+                    this->vertices.push_back(vertex);
+                }
+
+                for(const ObjFile::f& _f : raw_f){
+                    for(int i = 0;i < _f.n_v - 2;i++){
+                        Obj::Triangle* triangle = new Obj::Triangle();
+                        this->triangles.push_back(triangle);
+
+                        triangle->A = this->vertices[_f.index[0] - 1];
+                        if(_f.index[1] <= raw_vt.size()){
+                            triangle->A_texture_uv = Eigen::Vector2f(raw_vt[_f.index[1] - 1].u, raw_vt[_f.index[1] - 1].v);
+                        }
+                        if(_f.index[2] <= raw_vn.size()){
+                            triangle->A_normal = Eigen::Vector3f(raw_vn[_f.index[2] - 1].x, raw_vn[_f.index[2] - 1].y, raw_vn[_f.index[2] - 1].z);
+                        }
+                        triangle->B = this->vertices[_f.index[(i + 1) * _f.n_p] - 1];
+                        if(_f.index[(i + 1) * _f.n_p + 1] <= raw_vt.size()){
+                            triangle->B_texture_uv = Eigen::Vector2f(raw_vt[_f.index[(i + 1) * _f.n_p + 1] - 1].u, raw_vt[_f.index[(i + 1) * _f.n_p + 1] - 1].v);
+                        }
+                        if(_f.index[(i + 1) * _f.n_p + 2] <= raw_vn.size()){
+                            triangle->B_normal = Eigen::Vector3f(raw_vn[_f.index[(i + 1) * _f.n_p + 2] - 1].x, raw_vn[_f.index[(i + 1) * _f.n_p + 2] - 1].y, raw_vn[_f.index[(i + 1) * _f.n_p + 2] - 1].z);
+                        }
+                        triangle->C = this->vertices[_f.index[(i + 2) * _f.n_p] - 1];
+                        if(_f.index[(i + 2) * _f.n_p + 1] <= raw_vt.size()){
+                            triangle->C_texture_uv = Eigen::Vector2f(raw_vt[_f.index[(i + 2) * _f.n_p + 1] - 1].u, raw_vt[_f.index[(i + 2) * _f.n_p + 1] - 1].v);
+                        }
+                        if(_f.index[(i + 2) * _f.n_p + 2] <= raw_vn.size()){
+                            triangle->C_normal = Eigen::Vector3f(raw_vn[_f.index[(i + 2) * _f.n_p + 2] - 1].x, raw_vn[_f.index[(i + 2) * _f.n_p + 2] - 1].y, raw_vn[_f.index[(i + 2) * _f.n_p + 2] - 1].z);
+                        }
+
+                        triangle->AB = new Obj::Edge();
+                        this->edges.push_back(triangle->AB);
+                        triangle->AB->start = triangle->A;
+                        triangle->A->as_start.push_back(triangle->AB);
+                        triangle->AB->end = triangle->B;
+                        triangle->B->as_end.push_back(triangle->AB);
+                        triangle->AB->triangle = triangle;
+                        triangle->BC = new Obj::Edge();
+                        this->edges.push_back(triangle->BC);
+                        triangle->BC->start = triangle->B;
+                        triangle->B->as_start.push_back(triangle->BC);
+                        triangle->BC->end = triangle->C;
+                        triangle->C->as_end.push_back(triangle->BC);
+                        triangle->BC->triangle = triangle;
+                        triangle->CA = new Obj::Edge();
+                        this->edges.push_back(triangle->CA);
+                        triangle->CA->start = triangle->C;
+                        triangle->C->as_start.push_back(triangle->CA);
+                        triangle->CA->end = triangle->A;
+                        triangle->A->as_end.push_back(triangle->CA);
+                        triangle->CA->triangle = triangle;
+                    }
+                }
+
+                for(Obj::Edge* edge : this->edges){
+                    for(Obj::Edge* reverse : edge->start->as_end){
+                        if(reverse->start == edge->end){
+                            edge->reverse = reverse;
+                            break;
+                        }
+                    }
+                }
+            } // otherwise, file is not opened
+        }
+        ~ObjSet(){
+            for(int i = 0;i < this->vertices.size();i++){
+                if(this->vertices[i]){
+                    delete this->vertices[i];
+                    this->vertices[i] = nullptr;
+                }
+            }
+            this->vertices.clear();
+            for(int i = 0;i < this->edges.size();i++){
+                if(this->edges[i]){
+                    delete this->edges[i];
+                    this->edges[i] = nullptr;
+                }
+            }
+            this->edges.clear();
+            for(int i = 0;i < this->triangles.size();i++){
+                if(this->triangles[i]){
+                    delete this->triangles[i];
+                    this->triangles[i] = nullptr;
+                }
+            }
+            this->triangles.clear();
+        }
+    };
+
     class Ray{
     public:
         enum class Express{
@@ -138,183 +324,9 @@ namespace Obj{
     };
 }
 
-namespace ObjFile{
-    struct v{
-        float x, y, z;
-    };
-    struct vt{
-        float u, v;
-    };
-    struct vn{
-        float x, y, z;
-    };
-    struct f{
-        int n_v;
-        int n_p;
-        std::vector<int> index;
-    };
-}
 
-/*
-vertex_list,edge_list,triangle_list have elements allocated on the heap
-use `obj_deletor()` to delete them
-*/
-void obj_loader(std::vector<Obj::Vertex*>& vertices, std::vector<Obj::Edge*>& edges, std::vector<Obj::Triangle*>& triangles, const std::string obj_path){
-    using namespace ObjFile;
 
-    std::vector<v> raw_v;
-    std::vector<vt> raw_vt;
-    std::vector<vn> raw_vn;
-    std::vector<f> raw_f;
 
-    std::ifstream file(obj_path);
-    if(file.is_open()){
-        std::string line;
-        while(std::getline(file, line)){
-            if(line.substr(0, 2) == "v "){
-                v _v;
-                sscanf(line.c_str(), "v %f %f %f", &_v.x, &_v.y, &_v.z);
-                raw_v.push_back(_v);
-            }
-            else if(line.substr(0, 3) == "vt "){
-                vt _vt;
-                sscanf(line.c_str(), "vt %f %f", &_vt.u, &_vt.v);
-                raw_vt.push_back(_vt);
-            }
-            else if(line.substr(0, 3) == "vn "){
-                vn _vn;
-                sscanf(line.c_str(), "vn %f %f %f", &_vn.x, &_vn.y, &_vn.z);
-                raw_vn.push_back(_vn);
-            }
-            else if(line.substr(0, 2) == "f "){
-                f _f;
-                _f.n_p = 1;
-                _f.n_v = 1;
-                std::vector<char> buffer;
-                int i = 2;
-                while(line.c_str()[i] != '\0'){
-                    if(line.c_str()[i] == '/'){
-                        _f.n_p++;
-                        std::string str(buffer.begin(), buffer.end());
-                        buffer.clear();
-                        _f.index.push_back(std::stoi(str));
-                    }
-                    else if(line.c_str()[i] == ' '){
-                        _f.n_p = 1;
-                        _f.n_v++;
-                        std::string str(buffer.begin(), buffer.end());
-                        buffer.clear();
-                        _f.index.push_back(std::stoi(str));
-                    }
-                    else{
-                        buffer.push_back(line.c_str()[i]);
-                    }
-                    i++;
-                }
-                std::string str(buffer.begin(), buffer.end());
-                buffer.clear();
-                _f.index.push_back(std::stoi(str));
-                raw_f.push_back(_f);
-            }
-        }
-        file.close(); // Close the OBJ file
 
-        std::vector<Obj::Vertex*> vertex_list;
-        std::vector<Obj::Edge*> edge_list;
-        std::vector<Obj::Triangle*> triangle_list;
 
-        for(const v& _v : raw_v){
-            Obj::Vertex* vertex = new Obj::Vertex();
-            vertex->position = Eigen::Vector3f(_v.x, _v.y, _v.z);
-            vertex_list.push_back(vertex);
-        }
-
-        for(const f& _f : raw_f){
-            for(int i = 0;i < _f.n_v - 2;i++){
-                Obj::Triangle* triangle = new Obj::Triangle();
-                triangle_list.push_back(triangle);
-
-                triangle->A = vertex_list[_f.index[0] - 1];
-                if(_f.index[1] <= raw_vt.size()){
-                    triangle->A_texture_uv = Eigen::Vector2f(raw_vt[_f.index[1] - 1].u, raw_vt[_f.index[1] - 1].v);
-                }
-                if(_f.index[2] <= raw_vn.size()){
-                    triangle->A_normal = Eigen::Vector3f(raw_vn[_f.index[2] - 1].x, raw_vn[_f.index[2] - 1].y, raw_vn[_f.index[2] - 1].z);
-                }
-                triangle->B = vertex_list[_f.index[(i + 1) * _f.n_p] - 1];
-                if(_f.index[(i + 1) * _f.n_p + 1] <= raw_vt.size()){
-                    triangle->B_texture_uv = Eigen::Vector2f(raw_vt[_f.index[(i + 1) * _f.n_p + 1] - 1].u, raw_vt[_f.index[(i + 1) * _f.n_p + 1] - 1].v);
-                }
-                if(_f.index[(i + 1) * _f.n_p + 2] <= raw_vn.size()){
-                    triangle->B_normal = Eigen::Vector3f(raw_vn[_f.index[(i + 1) * _f.n_p + 2] - 1].x, raw_vn[_f.index[(i + 1) * _f.n_p + 2] - 1].y, raw_vn[_f.index[(i + 1) * _f.n_p + 2] - 1].z);
-                }
-                triangle->C = vertex_list[_f.index[(i + 2) * _f.n_p] - 1];
-                if(_f.index[(i + 2) * _f.n_p + 1] <= raw_vt.size()){
-                    triangle->C_texture_uv = Eigen::Vector2f(raw_vt[_f.index[(i + 2) * _f.n_p + 1] - 1].u, raw_vt[_f.index[(i + 2) * _f.n_p + 1] - 1].v);
-                }
-                if(_f.index[(i + 2) * _f.n_p + 2] <= raw_vn.size()){
-                    triangle->C_normal = Eigen::Vector3f(raw_vn[_f.index[(i + 2) * _f.n_p + 2] - 1].x, raw_vn[_f.index[(i + 2) * _f.n_p + 2] - 1].y, raw_vn[_f.index[(i + 2) * _f.n_p + 2] - 1].z);
-                }
-
-                triangle->AB = new Obj::Edge();
-                edge_list.push_back(triangle->AB);
-                triangle->AB->start = triangle->A;
-                triangle->A->as_start.push_back(triangle->AB);
-                triangle->AB->end = triangle->B;
-                triangle->B->as_end.push_back(triangle->AB);
-                triangle->AB->triangle = triangle;
-                triangle->BC = new Obj::Edge();
-                edge_list.push_back(triangle->BC);
-                triangle->BC->start = triangle->B;
-                triangle->B->as_start.push_back(triangle->BC);
-                triangle->BC->end = triangle->C;
-                triangle->C->as_end.push_back(triangle->BC);
-                triangle->BC->triangle = triangle;
-                triangle->CA = new Obj::Edge();
-                edge_list.push_back(triangle->CA);
-                triangle->CA->start = triangle->C;
-                triangle->C->as_start.push_back(triangle->CA);
-                triangle->CA->end = triangle->A;
-                triangle->A->as_end.push_back(triangle->CA);
-                triangle->CA->triangle = triangle;
-            }
-        }
-
-        for(Obj::Edge* edge : edge_list){
-            for(Obj::Edge* reverse : edge->start->as_end){
-                if(reverse->start == edge->end){
-                    edge->reverse = reverse;
-                    break;
-                }
-            }
-        }
-        vertices.insert(vertices.end(), vertex_list.begin(), vertex_list.end());
-        edges.insert(edges.end(), edge_list.begin(), edge_list.end());
-        triangles.insert(triangles.end(), triangle_list.begin(), triangle_list.end());
-    } // otherwise, file is not opened
-}
-
-void obj_deletor(std::vector<Obj::Vertex*>& vertex_list, std::vector<Obj::Edge*>& edge_list, std::vector<Obj::Triangle*>& triangle_list){
-    for(int i = 0;i < vertex_list.size();i++){
-        if(vertex_list[i]){
-            delete vertex_list[i];
-            vertex_list[i] = nullptr;
-        }
-    }
-    vertex_list.clear();
-    for(int i = 0;i < edge_list.size();i++){
-        if(edge_list[i]){
-            delete edge_list[i];
-            edge_list[i] = nullptr;
-        }
-    }
-    edge_list.clear();
-    for(int i = 0;i < triangle_list.size();i++){
-        if(triangle_list[i]){
-            delete triangle_list[i];
-            triangle_list[i] = nullptr;
-        }
-    }
-    triangle_list.clear();
-}
 

@@ -8,8 +8,8 @@
 #define PI 3.14159265359f
 
 #define EPSILON 0.000001
-#define MIN_F std::numeric_limits<float>::min()
-#define MAX_F std::numeric_limits<float>::max()
+#define MIN_F 1.17549435082228750796873653722224568e-38F
+#define MAX_F 3.40282346638528859811704183484516925e+38F
 
 inline void minimize(float& min, const float a){
     if(a < min){
@@ -82,9 +82,14 @@ inline const Eigen::Vector3f max(const Eigen::Vector3f a, const Eigen::Vector3f 
 inline const bool equal(const float a, const float b){
     return ((0 < a - b && a - b < EPSILON) || (0 < b - a && b - a < EPSILON));
 }
-
 inline const bool iszero(const float a){
-    return ((0 < a && a < EPSILON) || (0 < -a && -a < EPSILON));
+    return ((0 < a && a < EPSILON) || (0 > a && -a < EPSILON));
+}
+inline const bool no_less_than(const float a, const float b){
+    return (a > b - EPSILON);
+}
+inline const bool no_more_than(const float a, const float b){
+    return (a < b + EPSILON);
 }
 
 inline void truify(bool& to_change, bool condition){

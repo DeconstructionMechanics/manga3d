@@ -109,7 +109,7 @@ public:
     void init_buffs(Eigen::Vector3f bg_color){ //bg_color[1] => green => BLACKWHITE
         int wh = w * h;
         for(int i = 0;i < wh;i++){
-            z_buff[i] = MAX_F;
+            z_buff[i] = -MAX_F;
             if(this->image_color == Raster::ImageColor::FULLCOLOR){
                 top_buff[3 * i] = bg_color[0];
                 top_buff[3 * i + 1] = bg_color[1];
@@ -344,9 +344,7 @@ public:
 class Raster::Rasterizer{
 public:
 
-    std::vector<Obj::Vertex*> vertices;
-    std::vector<Obj::Edge*> edges;
-    std::vector<Obj::Triangle*> triangles;
+    std::vector<Obj::ObjSet> obj_set;
 
     std::vector<Raster::Light> lights;
     Raster::Camera camera;
@@ -354,10 +352,7 @@ public:
     Eigen::Vector3f bg_color;
 
     inline void load_obj(const std::string obj_path){
-        obj_loader(vertices, edges, triangles, obj_path);
-    }
-    inline void delete_obj(){
-        obj_deletor(vertices, edges, triangles);;
+        obj_set.push_back(Obj::ObjSet(obj_path));
     }
     Rasterizer(Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){}
     Rasterizer(const std::string obj_path, Eigen::Vector3f bg_color = Eigen::Vector3f(1, 1, 1)): bg_color(bg_color){
@@ -376,7 +371,7 @@ public:
             camera.projection(vertex->position);
             if(verbose){
                 i++;
-                if(i % 100 == 0){
+                if(i % 100 == 0 || i == this->vertices.size()){
                     print_progress(i, this->vertices.size(), "Project vertex");
                 }
             }
@@ -386,7 +381,7 @@ public:
         }
     }
 
-    void paint_line_simple(Eigen::Vector3f a, Eigen::Vector3f b, Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0)){
+    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Eigen::Vector3f& color = Eigen::Vector3f(0, 0, 0)){
         int dim = 0;
         if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
             dim = 1;
@@ -402,19 +397,35 @@ public:
             rightp = a;
         }
         Eigen::Vector3f i = (rightp - leftp).normalized();
-        for(;leftp[dim] < rightp[dim];leftp += i){
-            float* pixel_ptr = this->camera.get_top_buff(leftp);
-            if(pixel_ptr){
-                if(this->camera.image_color == Raster::ImageColor::BLACKWHITE){
-                    pixel_ptr[0] = color[1];
+        for(;leftp[dim] < rightp[dim] + 0.5;leftp += i){
+            for(int j = 0;j < 4;j++){
+                Eigen::Vector3f position = leftp;
+                if(j & 1){
+                    position[0]++;
                 }
-                else{
-                    pixel_ptr[0] = color[0];
-                    pixel_ptr[1] = color[1];
-                    pixel_ptr[2] = color[2];
+                if(j >> 1){
+                    position[1]++;
+                }
+                float* pixel_ptr = this->camera.get_top_buff(position);
+                float* z_ptr = this->camera.get_z_buff(position);
+                if(pixel_ptr && z_ptr){
+                    if(no_less_than(leftp[2], *z_ptr)){
+                        *z_ptr = leftp[2];
+                        if(this->camera.image_color == Raster::ImageColor::BLACKWHITE){
+                            pixel_ptr[0] = color[1];
+                        }
+                        else{
+                            pixel_ptr[0] = color[0];
+                            pixel_ptr[1] = color[1];
+                            pixel_ptr[2] = color[2];
+                        }
+                    }
                 }
             }
         }
+    }
+    inline void paint_line_simple(const Obj::Edge* edge, const Eigen::Vector3f& color = Eigen::Vector3f(0, 0, 0)){
+        paint_line_simple(edge->start->position, edge->end->position, color);
     }
     void paint_frame_simple(bool verbose = false){
         camera.init_buffs(bg_color);
@@ -425,7 +436,7 @@ public:
             paint_line_simple(edge->start->position, edge->end->position);
             if(verbose){
                 i++;
-                if(i % 100 == 0){
+                if(i % 100 == 0 || i == this->edges.size()){
                     print_progress(i, this->edges.size(), "Paint pixels");
                 }
             }
@@ -434,7 +445,7 @@ public:
             std::cout << std::endl << "End paint_frame_simple()" << std::endl;
         }
     }
-    void paint_outline_simple(Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0),bool verbose = false){
+    void paint_outline_simple(const Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0),float crease_angle = 1, bool verbose = false){
         camera.init_buffs(bg_color);
         int i = 0;
         project_vertices(verbose);
@@ -443,8 +454,8 @@ public:
             triangle->calculate_normal();
             if(verbose){
                 i++;
-                if(i % 100 == 0){
-                    print_progress(i, this->triangles.size(),"Triangle normal calculation");
+                if(i % 100 == 0 || i == this->triangles.size()){
+                    print_progress(i, this->triangles.size(), "Triangle normal calculation");
                 }
             }
         }
@@ -456,8 +467,8 @@ public:
         for(Obj::Triangle* triangle : this->triangles){
             if(verbose){
                 i++;
-                if(i % 100 == 0){
-                    print_progress(i, this->triangles.size(),"Triangle rasterizing");
+                if(i % 100 == 0 || i == this->triangles.size()){
+                    print_progress(i, this->triangles.size(), "Triangle rasterizing");
                 }
             }
             if(triangle->normal.value().z() < 0){
@@ -475,8 +486,8 @@ public:
             minimize(r, camera.w - 0.9);
             maximize(u, 0);
             minimize(d, camera.h - 0.9);
-            for(int x = l;x < r;x++){
-                for(int y = u;y < d;y++){
+            for(int y = u;y < d;y++){
+                for(int x = l;x < r;x++){
                     if(triangle->is_inside_triangle(x, y)){
                         Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
                         float z = bc_coord.dot(Eigen::Vector3f(triangle->A->position[2], triangle->B->position[2], triangle->C->position[2]));
@@ -484,39 +495,39 @@ public:
                             continue;
                         }
                         float* z_p = camera.get_z_buff_trust(x, y);
-                        if(z > *z_p){
+                        if(no_less_than(z, *z_p)){
                             *z_p = z;
 
-                            bool outline = false;
-                            float max_dist_boundary = 1.5;
-                            float max_crease_boundary = 1;
-                            float crease_angle = 2;
-                            truify(outline,((triangle->AB->is_boundary() || triangle->AB->is_silhouette()) && triangle->AB->point_distance_2d(x,y) < max_dist_boundary));
-                            truify(outline,((triangle->AB->is_crease(crease_angle)) && triangle->AB->point_distance_2d(x,y) < max_crease_boundary));
-                            truify(outline,((triangle->BC->is_boundary() || triangle->BC->is_silhouette()) && triangle->BC->point_distance_2d(x,y) < max_dist_boundary));
-                            truify(outline,((triangle->BC->is_crease(crease_angle)) && triangle->BC->point_distance_2d(x,y) < max_crease_boundary));
-                            truify(outline,((triangle->CA->is_boundary() || triangle->CA->is_silhouette()) && triangle->CA->point_distance_2d(x,y) < max_dist_boundary));
-                            truify(outline,((triangle->CA->is_crease(crease_angle)) && triangle->CA->point_distance_2d(x,y) < max_crease_boundary));
-                            
-                            Eigen::Vector3f this_color;
-                            if(outline){
-                                this_color = color;
-                            }
-                            else{
-                                this_color = bg_color;
-                            }
                             float* top_p = camera.get_top_buff_trust(x, y);
                             if(camera.image_color == Raster::ImageColor::BLACKWHITE){
-                                *top_p = this_color[1];
+                                *top_p = bg_color[1];
                             }
                             else{
-                                top_p[0] = this_color[0];
-                                top_p[1] = this_color[1];
-                                top_p[2] = this_color[2];
+                                top_p[0] = bg_color[0];
+                                top_p[1] = bg_color[1];
+                                top_p[2] = bg_color[2];
                             }
                         }
                     }
                 }
+            }
+            bool outline_AB = false;
+            bool outline_BC = false;
+            bool outline_CA = false;
+            truify(outline_AB, (triangle->AB->is_boundary() || triangle->AB->is_silhouette()));
+            truify(outline_BC, (triangle->BC->is_boundary() || triangle->BC->is_silhouette()));
+            truify(outline_CA, (triangle->CA->is_boundary() || triangle->CA->is_silhouette()));
+            truify(outline_AB, triangle->AB->is_crease(crease_angle));
+            truify(outline_BC, triangle->BC->is_crease(crease_angle));
+            truify(outline_CA, triangle->CA->is_crease(crease_angle));
+            if(outline_AB){
+                paint_line_simple(triangle->AB, color);
+            }
+            if(outline_BC){
+                paint_line_simple(triangle->BC, color);
+            }
+            if(outline_CA){
+                paint_line_simple(triangle->CA, color);
             }
         }
         if(verbose){
