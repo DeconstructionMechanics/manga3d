@@ -344,16 +344,21 @@ public:
 class Raster::Rasterizer{
 public:
 
-    std::vector<Obj::ObjSet> obj_set;
+    std::vector<Obj::ObjSet*> obj_set;
 
     std::vector<Raster::Light> lights;
     Raster::Camera camera;
 
     Eigen::Vector3f bg_color;
 
+    /*
+    new Obj::ObjSet is allocated on the heap
+        use `~ObjSet()` to delete them
+    */
     inline void load_obj(const std::string obj_path){
-        obj_set.push_back(Obj::ObjSet(obj_path));
+        obj_set.push_back(new Obj::ObjSet(obj_path));
     }
+    Rasterizer(Eigen::Vector3f bg_color = Eigen::Vector3f(1, 1, 1)): bg_color(bg_color){}
     Rasterizer(Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){}
     Rasterizer(const std::string obj_path, Eigen::Vector3f bg_color = Eigen::Vector3f(1, 1, 1)): bg_color(bg_color){
         load_obj(obj_path);
@@ -362,22 +367,33 @@ public:
         load_obj(obj_path);
     }
     ~Rasterizer(){
-        delete_obj();
+        for(int i = 0;i < this->obj_set.size();i++){
+            if(this->obj_set[i]){
+                delete this->obj_set[i];
+                this->obj_set[i] = nullptr;
+            }
+        }
+        this->obj_set.clear();
     }
 
     void project_vertices(bool verbose = false){
-        int i = 0;
-        for(Obj::Vertex* vertex : this->vertices){
-            camera.projection(vertex->position);
-            if(verbose){
-                i++;
-                if(i % 100 == 0 || i == this->vertices.size()){
-                    print_progress(i, this->vertices.size(), "Project vertex");
+        for(Obj::ObjSet* obj : this->obj_set){
+            int i = 0;
+            for(Obj::Vertex* vertex : obj->vertices){
+                camera.projection(vertex->position);
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->vertices.size()){
+                        print_progress(i, obj->vertices.size(), "Project vertex");
+                    }
                 }
+            }
+            if(verbose){
+                std::cout << std::endl;
             }
         }
         if(verbose){
-            std::cout << std::endl << "End project vertex" << std::endl;
+            std::cout << "End project vertex" << std::endl;
         }
     }
 
@@ -432,106 +448,122 @@ public:
         int i = 0;
         project_vertices(verbose);
 
-        for(Obj::Edge* edge : this->edges){
-            paint_line_simple(edge->start->position, edge->end->position);
-            if(verbose){
-                i++;
-                if(i % 100 == 0 || i == this->edges.size()){
-                    print_progress(i, this->edges.size(), "Paint pixels");
+        for(Obj::ObjSet* obj : this->obj_set){
+            i = 0;
+            for(Obj::Edge* edge : obj->edges){
+                paint_line_simple(edge->start->position, edge->end->position);
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->edges.size()){
+                        print_progress(i, obj->edges.size(), "Paint pixels");
+                    }
+                }
+                if(verbose){
+                    std::cout << std::endl;
                 }
             }
         }
         if(verbose){
-            std::cout << std::endl << "End paint_frame_simple()" << std::endl;
+            std::cout << "End paint_frame_simple()" << std::endl;
         }
     }
-    void paint_outline_simple(const Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0),float crease_angle = 1, bool verbose = false){
+    void paint_outline_simple(const Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0), float crease_angle = 1, bool verbose = false){
         camera.init_buffs(bg_color);
         int i = 0;
         project_vertices(verbose);
 
-        for(Obj::Triangle* triangle : this->triangles){
-            triangle->calculate_normal();
-            if(verbose){
-                i++;
-                if(i % 100 == 0 || i == this->triangles.size()){
-                    print_progress(i, this->triangles.size(), "Triangle normal calculation");
+        for(Obj::ObjSet* obj : this->obj_set){
+            i = 0;
+            for(Obj::Triangle* triangle : obj->triangles){
+                triangle->calculate_normal();
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->triangles.size()){
+                        print_progress(i, obj->triangles.size(), "Triangle normal calculation");
+                    }
                 }
+            }
+            if(verbose){
+                std::cout << std::endl;
             }
         }
         if(verbose){
-            std::cout << std::endl << "Triangle normal calculated" << std::endl;
+            std::cout << "Triangle normal calculated" << std::endl;
         }
-
-        i = 1;
-        for(Obj::Triangle* triangle : this->triangles){
-            if(verbose){
-                i++;
-                if(i % 100 == 0 || i == this->triangles.size()){
-                    print_progress(i, this->triangles.size(), "Triangle rasterizing");
+        for(Obj::ObjSet* obj : this->obj_set){
+            i = 1;
+            for(Obj::Triangle* triangle : obj->triangles){
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->triangles.size()){
+                        print_progress(i, obj->triangles.size(), "Triangle rasterizing");
+                    }
                 }
-            }
-            if(triangle->normal.value().z() < 0){
-                continue;
-            }
-            if(triangle->A->position[2] > 0 && triangle->B->position[2] > 0 && triangle->C->position[2] > 0){
-                continue;
-            }
-            float l, r, u, d;
-            l = min(triangle->A->position[0], triangle->B->position[0], triangle->C->position[0]) - 1;
-            r = max(triangle->A->position[0], triangle->B->position[0], triangle->C->position[0]) + 1;
-            u = min(triangle->A->position[1], triangle->B->position[1], triangle->C->position[1]) - 1;
-            d = max(triangle->A->position[1], triangle->B->position[1], triangle->C->position[1]) + 1;
-            maximize(l, 0);
-            minimize(r, camera.w - 0.9);
-            maximize(u, 0);
-            minimize(d, camera.h - 0.9);
-            for(int y = u;y < d;y++){
-                for(int x = l;x < r;x++){
-                    if(triangle->is_inside_triangle(x, y)){
-                        Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
-                        float z = bc_coord.dot(Eigen::Vector3f(triangle->A->position[2], triangle->B->position[2], triangle->C->position[2]));
-                        if(z > 0){
-                            continue;
-                        }
-                        float* z_p = camera.get_z_buff_trust(x, y);
-                        if(no_less_than(z, *z_p)){
-                            *z_p = z;
-
-                            float* top_p = camera.get_top_buff_trust(x, y);
-                            if(camera.image_color == Raster::ImageColor::BLACKWHITE){
-                                *top_p = bg_color[1];
+                if(triangle->normal.value().z() < 0){
+                    continue;
+                }
+                if(triangle->A->position[2] > 0 && triangle->B->position[2] > 0 && triangle->C->position[2] > 0){
+                    continue;
+                }
+                float l, r, u, d;
+                l = min(triangle->A->position[0], triangle->B->position[0], triangle->C->position[0]) - 1;
+                r = max(triangle->A->position[0], triangle->B->position[0], triangle->C->position[0]) + 1;
+                u = min(triangle->A->position[1], triangle->B->position[1], triangle->C->position[1]) - 1;
+                d = max(triangle->A->position[1], triangle->B->position[1], triangle->C->position[1]) + 1;
+                maximize(l, 0);
+                minimize(r, camera.w - 0.9);
+                maximize(u, 0);
+                minimize(d, camera.h - 0.9);
+                for(int y = u;y < d;y++){
+                    for(int x = l;x < r;x++){
+                        if(triangle->is_inside_triangle(x, y)){
+                            Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
+                            float z = bc_coord.dot(Eigen::Vector3f(triangle->A->position[2], triangle->B->position[2], triangle->C->position[2]));
+                            if(z > 0){
+                                continue;
                             }
-                            else{
-                                top_p[0] = bg_color[0];
-                                top_p[1] = bg_color[1];
-                                top_p[2] = bg_color[2];
+                            float* z_p = camera.get_z_buff_trust(x, y);
+                            if(no_less_than(z, *z_p)){
+                                *z_p = z;
+
+                                float* top_p = camera.get_top_buff_trust(x, y);
+                                if(camera.image_color == Raster::ImageColor::BLACKWHITE){
+                                    *top_p = bg_color[1];
+                                }
+                                else{
+                                    top_p[0] = bg_color[0];
+                                    top_p[1] = bg_color[1];
+                                    top_p[2] = bg_color[2];
+                                }
                             }
                         }
                     }
                 }
+                bool outline_AB = false;
+                bool outline_BC = false;
+                bool outline_CA = false;
+                truify(outline_AB, (triangle->AB->is_boundary() || triangle->AB->is_silhouette()));
+                truify(outline_BC, (triangle->BC->is_boundary() || triangle->BC->is_silhouette()));
+                truify(outline_CA, (triangle->CA->is_boundary() || triangle->CA->is_silhouette()));
+                truify(outline_AB, triangle->AB->is_crease(crease_angle));
+                truify(outline_BC, triangle->BC->is_crease(crease_angle));
+                truify(outline_CA, triangle->CA->is_crease(crease_angle));
+                if(outline_AB){
+                    paint_line_simple(triangle->AB, color);
+                }
+                if(outline_BC){
+                    paint_line_simple(triangle->BC, color);
+                }
+                if(outline_CA){
+                    paint_line_simple(triangle->CA, color);
+                }
             }
-            bool outline_AB = false;
-            bool outline_BC = false;
-            bool outline_CA = false;
-            truify(outline_AB, (triangle->AB->is_boundary() || triangle->AB->is_silhouette()));
-            truify(outline_BC, (triangle->BC->is_boundary() || triangle->BC->is_silhouette()));
-            truify(outline_CA, (triangle->CA->is_boundary() || triangle->CA->is_silhouette()));
-            truify(outline_AB, triangle->AB->is_crease(crease_angle));
-            truify(outline_BC, triangle->BC->is_crease(crease_angle));
-            truify(outline_CA, triangle->CA->is_crease(crease_angle));
-            if(outline_AB){
-                paint_line_simple(triangle->AB, color);
-            }
-            if(outline_BC){
-                paint_line_simple(triangle->BC, color);
-            }
-            if(outline_CA){
-                paint_line_simple(triangle->CA, color);
+            if(verbose){
+                std::cout << std::endl;
             }
         }
         if(verbose){
-            std::cout << std::endl << "End paint_outline_simple()" << std::endl;
+            std::cout << "End paint_outline_simple()" << std::endl;
         }
     }
 };

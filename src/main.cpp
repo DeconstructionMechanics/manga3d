@@ -48,7 +48,7 @@ int main(){
     rasterizer.paint_outline_simple(Eigen::Vector3f(0, 0, 0),1,true);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer, "outline");
+    show_image(rasterizer);//, "outline");
 
 
     return 0;
