@@ -4,17 +4,163 @@
 #include "OBJ.hpp"
 
 namespace Raster{
+    class Color;
     class Light;
     class PointLight;
     class Camera;
     class Rasterizer;
-    enum class ImageColor{
-        FULLCOLOR,
-        BLACKWHITE
-    };
 }
 
 
+
+/*
+heap data inside
+*/
+class Raster::Color{
+public:
+    enum class ImageColor{
+        FULLCOLORALPHA = 4,
+        FULLCOLOR = 3,
+        BLACKWHITEALPHA = 2,
+        BLACKWHITE = 1
+    };
+    std::string imgcolor_2_string(ImageColor color) const{
+        switch(color){
+        case ImageColor::FULLCOLORALPHA:
+            return "FULLCOLORALPHA";
+        case ImageColor::FULLCOLOR:
+            return "FULLCOLOR";
+        case ImageColor::BLACKWHITEALPHA:
+            return "BLACKWHITEALPHA";
+        default:
+            return "BLACKWHITEALPHA";
+        }
+    }
+    ImageColor image_color;
+    float* color;
+    /*
+    color is allocated on the heap,
+    using ~Color() to delete
+    */
+    Color(float r, float g, float b, float alpha):image_color(ImageColor::FULLCOLORALPHA){
+        color = new float[4];
+        color[0] = b;
+        color[1] = g;
+        color[2] = r;
+        color[3] = alpha;
+    }
+    Color(float r, float g, float b):image_color(ImageColor::FULLCOLOR){
+        color = new float[3];
+        color[0] = b;
+        color[1] = g;
+        color[2] = r;
+    }
+    Color(float g, float alpha):image_color(ImageColor::BLACKWHITEALPHA){
+        color = new float[2];
+        color[0] = g;
+        color[1] = alpha;
+    }
+    Color(float g): image_color(ImageColor::BLACKWHITE){
+        color = new float[1];
+        color[0] = g;
+    }
+    Color(ImageColor image_color, float g, float alpha): image_color(image_color){
+        color = new float[(int)image_color];
+        for(int i = 0;i < (int)image_color - 1;i++){
+            color[i] = g;
+        }
+        int last = (int)image_color - 1;
+        if(last % 2 == 1){
+            color[last] = alpha;
+        }
+        else{
+            color[last] = g;
+        }
+    }
+    ~Color(){
+        if(color){
+            delete[] color;
+            color = nullptr;
+        }
+    }
+    Color(const Color& other){
+        this->image_color = other.image_color;
+        this->color = new float[(int)other.image_color];
+        for(int i = 0;i < (int)image_color;i++){
+            this->color[i] = other.color[i];
+        }
+    }
+    inline Color& operator=(const Color& other){
+        if(this->color){
+            delete[] this->color;
+            this->color = nullptr;
+        }
+        this->image_color = other.image_color;
+        this->color = new float[(int)other.image_color];
+        for(int i = 0;i < (int)image_color;i++){
+            this->color[i] = other.color[i];
+        }
+    }
+
+    inline void color_assign_fullcoloralpha(float* buff) const{
+        if(this->image_color != ImageColor::FULLCOLORALPHA){
+            throw Manga3DException("Color assignment unmatch, expect FULLCOLORALPHA, get " + imgcolor_2_string(image_color));
+        }
+        buff[0] = color[0];
+        buff[1] = color[1];
+        buff[2] = color[2];
+        buff[3] = color[3];
+    }
+    inline void color_assign_fullcolor(float* buff) const{
+        if(this->image_color != ImageColor::FULLCOLOR){
+            throw Manga3DException("Color assignment unmatch, expect FULLCOLOR, get " + imgcolor_2_string(image_color));
+        }
+        buff[0] = color[0];
+        buff[1] = color[1];
+        buff[2] = color[2];
+    }
+    inline void color_assign_blackwhitealpha(float* buff) const{
+        if(this->image_color != ImageColor::BLACKWHITEALPHA){
+            throw Manga3DException("Color assignment unmatch, expect BLACKWHITEALPHA, get " + imgcolor_2_string(image_color));
+        }
+        buff[0] = color[0];
+        buff[1] = color[1];
+    }
+    inline void color_assign_blackwhite(float* buff) const{
+        if(this->image_color != ImageColor::BLACKWHITE){
+            throw Manga3DException("Color assignment unmatch, expect BLACKWHITE, get " + imgcolor_2_string(image_color));
+        }
+        buff[0] = color[0];
+    }
+    inline friend void color_assign(Color& color, float* ptr){
+        switch(color.image_color){
+        case ImageColor::FULLCOLORALPHA:
+            color.color_assign_fullcoloralpha(ptr);
+            break;
+        case ImageColor::FULLCOLOR:
+            color.color_assign_fullcolor(ptr);
+            break;
+        case ImageColor::BLACKWHITEALPHA:
+            color.color_assign_blackwhitealpha(ptr);
+            break;
+        default:
+            color.color_assign_blackwhite(ptr);
+            break;
+        }
+    }
+
+    inline bool operator!=(Color& compare_color){
+        if(this->image_color == compare_color.image_color){
+            for(int i = 0;i < (int)this->image_color;i++){
+                if(this->color[i] != compare_color.color[i]){
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+};
 
 
 
@@ -33,8 +179,13 @@ class Raster::PointLight: public Raster::Light{
 
 
 
-
+/*
+heap data inside
+*/
 class Raster::Camera{
+private:
+    Camera(const Camera& other);
+    Camera& operator=(const Camera& other);
 public:
     enum class Projection{
         ORTHO,
@@ -43,7 +194,7 @@ public:
     };
 
     Projection projection_type;
-    Raster::ImageColor image_color;
+    Raster::Color bg_color;
     int w;
     int h;
 private:
@@ -74,12 +225,7 @@ public:
         if(w <= 0 || h <= 0){
             throw Manga3DException("Raster::Camera::alloc_buff(): illegal w,h");
         }
-        if(image_color == Raster::ImageColor::FULLCOLOR){
-            top_buff = new float[w * h * 3];
-        }
-        else{
-            top_buff = new float[w * h];
-        }
+        top_buff = new float[w * h * (int)bg_color.image_color];
     }
     inline void delete_buff(){
         if(z_buff){
@@ -94,11 +240,7 @@ public:
         z_buff = nullptr;
         top_buff = nullptr;
     }
-    Camera(): image_color(Raster::ImageColor::BLACKWHITE), w(1), h(1){
-        clear_buff();
-        alloc_buff();
-    }
-    Camera(Raster::ImageColor image_color, int w, int h): image_color(image_color), w(w), h(h){
+    Camera(Raster::Color bg_color, int w, int h): bg_color(bg_color), w(w), h(h){
         clear_buff();
         alloc_buff();
     }
@@ -106,57 +248,54 @@ public:
         delete_buff();
     }
 
-    void init_buffs(Eigen::Vector3f bg_color){ //bg_color[1] => green => BLACKWHITE
+    void init_buffs(){ //bg_color[1] => green => BLACKWHITE
         int wh = w * h;
+        float* z_buff_t = z_buff;
+        float* top_buff_t = top_buff;
         for(int i = 0;i < wh;i++){
-            z_buff[i] = -MAX_F;
-            if(this->image_color == Raster::ImageColor::FULLCOLOR){
-                top_buff[3 * i] = bg_color[0];
-                top_buff[3 * i + 1] = bg_color[1];
-                top_buff[3 * i + 2] = bg_color[2];
-            }
-            else{
-                top_buff[i] = bg_color[1];
-            }
+            *z_buff_t = -MAX_F;
+            z_buff_t++;
+            color_assign(bg_color, top_buff_t);
+            top_buff_t += (int)bg_color.image_color;
         }
     }
 
-    inline float* get_buff(Eigen::Vector3f ind, float* buff) const{
+    inline float* get_buff(Eigen::Vector3f ind, float* buff, int channel) const{
         if(top_buff == NULL || ind[2] > 0){
             return nullptr;
         }
-        return get_buff((int)ind[0], (int)ind[1], buff);
+        return get_buff((int)ind[0], (int)ind[1], buff, channel);
     }
-    inline float* get_buff(int x, int y, float* buff) const{
+    inline float* get_buff(int x, int y, float* buff, int channel) const{
         if(x < 0 || x >= this->w || y < 0 || y >= this->w){
             return nullptr;
         }
-        return get_buff_trust(x, y, buff);
+        return get_buff_trust(x, y, buff, channel);
     }
-    inline float* get_buff_trust(int x, int y, float* buff) const{
+    inline float* get_buff_trust(int x, int y, float* buff, int channel) const{
         int index = x + y * this->w;
-        if(this->image_color == Raster::ImageColor::FULLCOLOR){
-            index *= 3;
+        if(channel > 1){
+            index *= channel;
         }
         return &(buff[index]);
     }
     inline float* get_top_buff(Eigen::Vector3f ind) const{
-        return get_buff((int)ind[0], (int)ind[1], this->top_buff);
+        return get_buff((int)ind[0], (int)ind[1], this->top_buff, (int)this->bg_color.image_color);
     }
     inline float* get_top_buff(int x, int y) const{
-        return get_buff(x, y, this->top_buff);
+        return get_buff(x, y, this->top_buff, (int)this->bg_color.image_color);
     }
     inline float* get_top_buff_trust(int x, int y) const{
-        return get_buff_trust(x, y, this->top_buff);
+        return get_buff_trust(x, y, this->top_buff, (int)this->bg_color.image_color);
     }
     inline float* get_z_buff(Eigen::Vector3f ind) const{
-        return get_buff((int)ind[0], (int)ind[1], this->z_buff);
+        return get_buff((int)ind[0], (int)ind[1], this->z_buff, 1);
     }
     inline float* get_z_buff(int x, int y) const{
-        return get_buff(x, y, this->z_buff);
+        return get_buff(x, y, this->z_buff, 1);
     }
     inline float* get_z_buff_trust(int x, int y) const{
-        return get_buff_trust(x, y, this->z_buff);
+        return get_buff_trust(x, y, this->z_buff, 1);
     }
 
 private:
@@ -172,14 +311,17 @@ private:
     std::optional<Eigen::Matrix4f> fisheyeviewport_matrix_cache; //w h fov
 
 public:
-    void config(Projection projection_type, Raster::ImageColor image_color, int w, int h, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat_g, float up_t = 0, float near = 0.0001, float far = 10000){
+    void config(Projection projection_type, Raster::Color bg_color, int w, int h, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat_g, float up_t = 0, float near = 0.0001, float far = 10000){
         this->projection_type = projection_type;
-        if(this->image_color != image_color || this->w != w || this->h != h){
+        if(this->bg_color.image_color != bg_color.image_color || this->w != w || this->h != h){
             delete_buff();
-            this->image_color = image_color;
+            this->bg_color = bg_color;
             this->w = w;
             this->h = h;
             alloc_buff();
+        }
+        else if(this->bg_color != bg_color){
+            this->bg_color = bg_color;
         }
 
         //update putcamera_matrix_cache
@@ -291,7 +433,7 @@ public:
 
     }
     inline void config(float fovY, Eigen::Vector3f position, Eigen::Vector3f lookat_g){
-        config(this->projection_type, this->image_color, this->w, this->h, this->fovY, position, lookat_g);
+        config(this->projection_type, this->bg_color, this->w, this->h, this->fovY, position, lookat_g);
     }
 
     void projection(Eigen::Vector3f& point_position) const{
@@ -341,6 +483,9 @@ public:
 
 
 
+/*
+heap pointer inside member
+*/
 class Raster::Rasterizer{
 public:
 
@@ -349,7 +494,6 @@ public:
     std::vector<Raster::Light> lights;
     Raster::Camera camera;
 
-    Eigen::Vector3f bg_color;
 
     /*
     new Obj::ObjSet is allocated on the heap
@@ -358,19 +502,14 @@ public:
     inline void load_obj(const std::string obj_path){
         obj_set.push_back(new Obj::ObjSet(obj_path));
     }
-    Rasterizer(Eigen::Vector3f bg_color = Eigen::Vector3f(1, 1, 1)): bg_color(bg_color){}
-    Rasterizer(Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){}
-    Rasterizer(const std::string obj_path, Eigen::Vector3f bg_color = Eigen::Vector3f(1, 1, 1)): bg_color(bg_color){
-        load_obj(obj_path);
-    }
-    Rasterizer(const std::string obj_path, Raster::ImageColor image_color, int w, int h): camera(image_color, w, h){
+    Rasterizer(Raster::Color bg_color = Raster::Color(0, 0)): camera(bg_color, 1, 1){}
+    Rasterizer(const std::string obj_path, Raster::Color bg_color = Raster::Color(0, 0)): camera(bg_color, 1, 1){
         load_obj(obj_path);
     }
     ~Rasterizer(){
-        for(int i = 0;i < this->obj_set.size();i++){
-            if(this->obj_set[i]){
-                delete this->obj_set[i];
-                this->obj_set[i] = nullptr;
+        for(Obj::ObjSet* obj : this->obj_set){
+            if(obj){
+                delete obj;
             }
         }
         this->obj_set.clear();
@@ -397,7 +536,8 @@ public:
         }
     }
 
-    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Eigen::Vector3f& color = Eigen::Vector3f(0, 0, 0)){
+
+    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Raster::Color& color){
         int dim = 0;
         if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
             dim = 1;
@@ -427,31 +567,24 @@ public:
                 if(pixel_ptr && z_ptr){
                     if(no_less_than(leftp[2], *z_ptr)){
                         *z_ptr = leftp[2];
-                        if(this->camera.image_color == Raster::ImageColor::BLACKWHITE){
-                            pixel_ptr[0] = color[1];
-                        }
-                        else{
-                            pixel_ptr[0] = color[0];
-                            pixel_ptr[1] = color[1];
-                            pixel_ptr[2] = color[2];
-                        }
+                        color_assign(color, pixel_ptr);
                     }
                 }
             }
         }
     }
-    inline void paint_line_simple(const Obj::Edge* edge, const Eigen::Vector3f& color = Eigen::Vector3f(0, 0, 0)){
+    inline void paint_line_simple(const Obj::Edge* edge, const Raster::Color& color){
         paint_line_simple(edge->start->position, edge->end->position, color);
     }
     void paint_frame_simple(bool verbose = false){
-        camera.init_buffs(bg_color);
+        camera.init_buffs();
         int i = 0;
         project_vertices(verbose);
 
         for(Obj::ObjSet* obj : this->obj_set){
             i = 0;
             for(Obj::Edge* edge : obj->edges){
-                paint_line_simple(edge->start->position, edge->end->position);
+                paint_line_simple(edge->start->position, edge->end->position, Raster::Color(this->camera.bg_color.image_color, 0, 1));
                 if(verbose){
                     i++;
                     if(i % 100 == 0 || i == obj->edges.size()){
@@ -467,8 +600,11 @@ public:
             std::cout << "End paint_frame_simple()" << std::endl;
         }
     }
-    void paint_outline_simple(const Eigen::Vector3f color = Eigen::Vector3f(0, 0, 0), float crease_angle = 1, bool verbose = false){
-        camera.init_buffs(bg_color);
+
+
+    // todo change color def
+    void paint_outline_simple(const Raster::Color color, Raster::Color fill_color, float crease_angle = 1, bool verbose = false){
+        camera.init_buffs();
         int i = 0;
         project_vertices(verbose);
 
@@ -527,14 +663,7 @@ public:
                                 *z_p = z;
 
                                 float* top_p = camera.get_top_buff_trust(x, y);
-                                if(camera.image_color == Raster::ImageColor::BLACKWHITE){
-                                    *top_p = bg_color[1];
-                                }
-                                else{
-                                    top_p[0] = bg_color[0];
-                                    top_p[1] = bg_color[1];
-                                    top_p[2] = bg_color[2];
-                                }
+                                color_assign(fill_color, top_p);
                             }
                         }
                     }

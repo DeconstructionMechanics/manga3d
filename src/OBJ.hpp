@@ -133,6 +133,10 @@ namespace Obj{
         }
     }
 
+
+    /*
+    heap pointer inside member
+    */
     class ObjSet{
     public:
         std::vector<Obj::Vertex*> vertices;
@@ -142,7 +146,7 @@ namespace Obj{
 
         /*
         vertex_list,edge_list,triangle_list have elements allocated on the heap
-        use `~ObjSet()` to delete them
+        use `clear_heap()` to delete them
         */
         ObjSet(const std::string obj_path){
             std::vector<ObjFile::v> raw_v;
@@ -202,7 +206,7 @@ namespace Obj{
                 }
                 file.close(); // Close the OBJ file
 
-                
+
 
                 for(const ObjFile::v& _v : raw_v){
                     Obj::Vertex* vertex = new Obj::Vertex();
@@ -271,7 +275,8 @@ namespace Obj{
                 }
             } // otherwise, file is not opened
         }
-        ~ObjSet(){
+
+        void clear_heap(){
             for(int i = 0;i < this->vertices.size();i++){
                 if(this->vertices[i]){
                     delete this->vertices[i];
