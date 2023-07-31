@@ -100,6 +100,7 @@ public:
         for(int i = 0;i < (int)image_color;i++){
             this->color[i] = other.color[i];
         }
+        return *this;
     }
 
     inline void color_assign_fullcoloralpha(float* buff) const{
@@ -537,7 +538,7 @@ public:
     }
 
 
-    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Raster::Color& color){
+    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Raster::Color& color, const int thickness = 2){
         int dim = 0;
         if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
             dim = 1;
@@ -557,14 +558,24 @@ public:
         }
         Eigen::Vector3f i = (rightp - leftp).normalized();
         for(;leftp[dim] < rightp[dim] + 0.5;leftp += i){
-            for(int j = 0;j < 4;j++){
-                Eigen::Vector3f position = leftp;
-                if(j & 1){
-                    position[0]++;
-                }
-                if(j >> 1){
-                    position[1]++;
-                }
+            std::vector<Eigen::Vector3f> positions;
+            positions.push_back(leftp);
+            if(thickness > 1){
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1,leftp[1],leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0],leftp[1] + 1,leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1,leftp[1] + 1,leftp[2]));
+            }
+            if(thickness > 2){
+                positions.push_back(Eigen::Vector3f(leftp[0] - 1,leftp[1],leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] - 1,leftp[1] + 1,leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0],leftp[1] - 1,leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1,leftp[1] - 1,leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 2,leftp[1],leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 2,leftp[1] + 1,leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0],leftp[1] + 2,leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1,leftp[1] + 2,leftp[2]));
+            }
+            for(Eigen::Vector3f& position : positions){
                 float* pixel_ptr = this->camera.get_top_buff(position);
                 float* z_ptr = this->camera.get_z_buff(position);
                 if(pixel_ptr && z_ptr){

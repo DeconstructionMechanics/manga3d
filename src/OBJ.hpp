@@ -23,6 +23,7 @@ namespace ObjFile{
         int n_v;
         int n_p;
         std::vector<int> index;
+        bool is_smooth;
     };
 }
 
@@ -79,9 +80,10 @@ namespace Obj{
         Edge* AB;
         Edge* BC;
         Edge* CA;
+        bool is_smooth;
         std::optional<Vector3f> normal;
 
-        Triangle(): A(nullptr), B(nullptr), C(nullptr), AB(nullptr), BC(nullptr), CA(nullptr){};
+        Triangle(): A(nullptr), B(nullptr), C(nullptr), AB(nullptr), BC(nullptr), CA(nullptr), is_smooth(false){};
 
         inline void calculate_normal(){
             this->normal = (this->B->position - this->A->position).cross(this->A->position - this->C->position).normalized();
@@ -142,7 +144,7 @@ namespace Obj{
         std::vector<Obj::Vertex*> vertices;
         std::vector<Obj::Edge*> edges;
         std::vector<Obj::Triangle*> triangles;
-        Texture texture;
+        std::optional<Tex::Texture> texture;
 
         /*
         vertex_list,edge_list,triangle_list have elements allocated on the heap
@@ -157,6 +159,7 @@ namespace Obj{
             std::ifstream file(obj_path);
             if(file.is_open()){
                 std::string line;
+                int smooth_group = 0;
                 while(std::getline(file, line)){
                     if(line.substr(0, 2) == "v "){
                         ObjFile::v _v;
@@ -173,8 +176,12 @@ namespace Obj{
                         sscanf(line.c_str(), "vn %f %f %f", &_vn.x, &_vn.y, &_vn.z);
                         raw_vn.push_back(_vn);
                     }
+                    else if(line.substr(0, 2) == "s "){
+                        sscanf(line.c_str(), "s %d", &smooth_group);
+                    }
                     else if(line.substr(0, 2) == "f "){
                         ObjFile::f _f;
+                        _f.is_smooth = (smooth_group != 0);
                         _f.n_p = 1;
                         _f.n_v = 1;
                         std::vector<char> buffer;
@@ -219,6 +226,7 @@ namespace Obj{
                         Obj::Triangle* triangle = new Obj::Triangle();
                         this->triangles.push_back(triangle);
 
+                        triangle->is_smooth = _f.is_smooth;
                         triangle->A = this->vertices[_f.index[0] - 1];
                         if(_f.index[1] <= raw_vt.size()){
                             triangle->A_texture_uv = Eigen::Vector2f(raw_vt[_f.index[1] - 1].u, raw_vt[_f.index[1] - 1].v);
