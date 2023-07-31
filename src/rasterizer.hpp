@@ -132,7 +132,7 @@ public:
         }
         buff[0] = color[0];
     }
-    inline friend void color_assign(Color& color, float* ptr){
+    inline friend void color_assign(const Color& color, float* ptr){
         switch(color.image_color){
         case ImageColor::FULLCOLORALPHA:
             color.color_assign_fullcoloralpha(ptr);
