@@ -267,7 +267,7 @@ public:
         return get_buff((int)ind[0], (int)ind[1], buff, channel);
     }
     inline float* get_buff(int x, int y, float* buff, int channel) const{
-        if(x < 0 || x >= this->w || y < 0 || y >= this->w){
+        if(x < 0 || x >= this->w || y < 0 || y >= this->h){
             return nullptr;
         }
         return get_buff_trust(x, y, buff, channel);
@@ -542,6 +542,9 @@ public:
         if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
             dim = 1;
         };
+        if(equal(a[dim],b[dim])){
+            return;
+        }
         Eigen::Vector3f leftp;
         Eigen::Vector3f rightp;
         if(a[dim] < b[dim]){
@@ -576,7 +579,7 @@ public:
     inline void paint_line_simple(const Obj::Edge* edge, const Raster::Color& color){
         paint_line_simple(edge->start->position, edge->end->position, color);
     }
-    void paint_frame_simple(bool verbose = false){
+    void paint_frame_simple(Raster::Color color, bool verbose = false){
         camera.init_buffs();
         int i = 0;
         project_vertices(verbose);
@@ -584,16 +587,16 @@ public:
         for(Obj::ObjSet* obj : this->obj_set){
             i = 0;
             for(Obj::Edge* edge : obj->edges){
-                paint_line_simple(edge->start->position, edge->end->position, Raster::Color(this->camera.bg_color.image_color, 0, 1));
+                paint_line_simple(edge, color);
                 if(verbose){
                     i++;
                     if(i % 100 == 0 || i == obj->edges.size()){
-                        print_progress(i, obj->edges.size(), "Paint pixels");
+                        print_progress(i, obj->edges.size(), "Paint edge");
                     }
                 }
-                if(verbose){
-                    std::cout << std::endl;
-                }
+            }
+            if(verbose){
+                std::cout << std::endl;
             }
         }
         if(verbose){
@@ -650,6 +653,9 @@ public:
                 minimize(r, camera.w - 0.9);
                 maximize(u, 0);
                 minimize(d, camera.h - 0.9);
+                if(l > r || u > d){
+                    continue;
+                }
                 for(int y = u;y < d;y++){
                     for(int x = l;x < r;x++){
                         if(triangle->is_inside_triangle(x, y)){
@@ -671,12 +677,12 @@ public:
                 bool outline_AB = false;
                 bool outline_BC = false;
                 bool outline_CA = false;
-                truify(outline_AB, (triangle->AB->is_boundary() || triangle->AB->is_silhouette()));
-                truify(outline_BC, (triangle->BC->is_boundary() || triangle->BC->is_silhouette()));
-                truify(outline_CA, (triangle->CA->is_boundary() || triangle->CA->is_silhouette()));
-                truify(outline_AB, triangle->AB->is_crease(crease_angle));
-                truify(outline_BC, triangle->BC->is_crease(crease_angle));
-                truify(outline_CA, triangle->CA->is_crease(crease_angle));
+                outline_AB |= (triangle->AB->is_boundary() || triangle->AB->is_silhouette());
+                outline_BC |= (triangle->BC->is_boundary() || triangle->BC->is_silhouette());
+                outline_CA |= (triangle->CA->is_boundary() || triangle->CA->is_silhouette());
+                outline_AB |= triangle->AB->is_crease(crease_angle);
+                outline_BC |= triangle->BC->is_crease(crease_angle);
+                outline_CA |= triangle->CA->is_crease(crease_angle);
                 if(outline_AB){
                     paint_line_simple(triangle->AB, color);
                 }

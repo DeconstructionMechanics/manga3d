@@ -273,7 +273,10 @@ namespace Obj{
                         }
                     }
                 }
-            } // otherwise, file is not opened
+            }
+            else{
+                throw Manga3DException("Obj: .obj file is not opened, " + obj_path);
+            }
         }
 
         void clear_heap(){

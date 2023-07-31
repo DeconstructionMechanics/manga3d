@@ -52,23 +52,23 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
 }
 
 int main(){
-    Raster::Color bg_color(1, 0);
-    Raster::Color line_color(0, 1);
-    Raster::Color fill_color(1, 1);
+    Raster::Color bg_color(1);
+    Raster::Color line_color(0);
+    Raster::Color fill_color(1);
 
-    Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj");
+    Raster::Rasterizer rasterizer(".\\model\\monkey\\monkey.obj");
     std::cout << "load complete" << std::endl;
 
-    Eigen::Vector3f position(1.5, 0, 0);
-    Eigen::Vector3f lookat(-1, 0, 0);
-    rasterizer.camera.config(Raster::Camera::Projection::PERSP, bg_color, 600, 400, PI / 2, position, lookat);
+    Eigen::Vector3f position(0, 0, 5);
+    Eigen::Vector3f lookat(0, 0, -1);
+    rasterizer.camera.config(Raster::Camera::Projection::PERSP, bg_color, 900, 600, PI / 2, position, lookat);
 
     std::cout << "rendering" << std::endl;
-    // rasterizer.paint_frame_simple(true);
+    // rasterizer.paint_frame_simple(line_color,true);
     rasterizer.paint_outline_simple(line_color, fill_color, 1, true);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer, "outline2");//, "outline");4
+    show_image(rasterizer, "monkey");//, "outline");4
 
 
     return 0;
