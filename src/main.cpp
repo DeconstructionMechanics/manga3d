@@ -55,11 +55,11 @@ int main(){
     Raster::Color line_color(0,0,0,1);
     Raster::Color fill_color(1,1,1,1);
 
-    Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj", ".\\model\\cow\\spot_texture.png");
+    Raster::Rasterizer rasterizer(".\\model\\monkey\\monkey.obj", ".\\model\\monkey\\color.png");
     std::cout << "load complete" << std::endl;
 
-    Eigen::Vector3f position(0, 0, -2);
-    Eigen::Vector3f lookat(0, 0, 1);
+    Eigen::Vector3f position(0, 0, 5);
+    Eigen::Vector3f lookat(0, 0, -1);
     rasterizer.camera.config(Raster::Camera::Projection::PERSP, bg_color, 900, 600, PI / 2, position, lookat);
 
     std::cout << "rendering" << std::endl;
@@ -67,7 +67,7 @@ int main(){
     rasterizer.paint_simple(line_color, fill_color, 1, "texture", true);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer);//, "monkeyframe");
+    show_image(rasterizer,"monkey");//, "monkeyframe");
 
 
     return 0;
