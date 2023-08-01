@@ -4,6 +4,11 @@
 #include <vector>
 #include <limits>
 #include <cmath>
+#include <iostream>
+#include <string>
+#include <optional>
+
+
 
 #define PI 3.14159265359f
 

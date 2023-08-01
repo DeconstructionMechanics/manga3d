@@ -3,8 +3,7 @@
 #include <string>
 
 #include "global.hpp"
-#include "BVH.hpp"
-#include "Rasterizer.hpp"
+#include "./raster/Rasterizer.hpp"
 
 
 void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename = std::nullopt){
@@ -51,15 +50,16 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
 }
 
 int main(){
-    Raster::Color bg_color(1,1,1,0);
-    Raster::Color line_color(0,0,0,1);
-    Raster::Color fill_color(1,1,1,1);
+    Raster::Color bg_color(1,1,1, 0);
+    Raster::Color line_color(0,0,0, 1);
+    Raster::Color fill_color(1,1,1, 1);
 
     Raster::Rasterizer rasterizer(".\\model\\monkey\\monkey.obj", ".\\model\\monkey\\color.png");
+    // Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj", ".\\model\\cow\\spot_texture.png");
     std::cout << "load complete" << std::endl;
 
-    Eigen::Vector3f position(0, 0, 5);
-    Eigen::Vector3f lookat(0, 0, -1);
+    Eigen::Vector3f position(0.001, 0, 5);
+    Eigen::Vector3f lookat(0, 0,-1);
     rasterizer.camera.config(Raster::Camera::Projection::PERSP, bg_color, 900, 600, PI / 2, position, lookat);
 
     std::cout << "rendering" << std::endl;
@@ -67,7 +67,7 @@ int main(){
     rasterizer.paint_simple(line_color, fill_color, 1, "texture", true);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer,"monkey");//, "monkeyframe");
+    show_image(rasterizer, "monkey");//, "monkeyframe");
 
 
     return 0;

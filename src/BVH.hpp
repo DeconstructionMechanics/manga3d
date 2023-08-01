@@ -1,7 +1,7 @@
 #pragma once
 
 #include "global.hpp"
-#include "OBJ.hpp"
+#include "./obj/OBJ.hpp"
 
 
 
