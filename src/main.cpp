@@ -3,9 +3,8 @@
 #include <string>
 
 #include "global.hpp"
-#include "OBJ.hpp"
 #include "BVH.hpp"
-#include "rasterizer.hpp"
+#include "Rasterizer.hpp"
 
 
 void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename = std::nullopt){
@@ -27,7 +26,7 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
     case Raster::Color::ImageColor::BLACKWHITEALPHA:
         image_2c = cv::Mat(raster.camera.h, raster.camera.w, CV_32FC2, raster.camera.top_buff);
         cv::split(image_2c, channels2);
-        channels4 = {channels2[0],channels2[0].clone(),channels2[0].clone(),channels2[1]};
+        channels4 = { channels2[0],channels2[0].clone(),channels2[0].clone(),channels2[1] };
         cv::merge(channels4, image);
         image *= 256;
         image.convertTo(image, CV_8UC4);
@@ -52,23 +51,23 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
 }
 
 int main(){
-    Raster::Color bg_color(1);
-    Raster::Color line_color(0);
-    Raster::Color fill_color(1);
+    Raster::Color bg_color(1,1,1,0);
+    Raster::Color line_color(0,0,0,1);
+    Raster::Color fill_color(1,1,1,1);
 
-    Raster::Rasterizer rasterizer(".\\model\\monkey\\monkey.obj");
+    Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj", ".\\model\\cow\\spot_texture.png");
     std::cout << "load complete" << std::endl;
 
-    Eigen::Vector3f position(0, 0, 5);
-    Eigen::Vector3f lookat(0, 0, -1);
+    Eigen::Vector3f position(0, 0, -2);
+    Eigen::Vector3f lookat(0, 0, 1);
     rasterizer.camera.config(Raster::Camera::Projection::PERSP, bg_color, 900, 600, PI / 2, position, lookat);
 
     std::cout << "rendering" << std::endl;
     // rasterizer.paint_frame_simple(line_color,true);
-    rasterizer.paint_outline_simple(line_color, fill_color, 1, true);
+    rasterizer.paint_simple(line_color, fill_color, 1, "texture", true);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer, "monkey");//, "outline");4
+    show_image(rasterizer);//, "monkeyframe");
 
 
     return 0;

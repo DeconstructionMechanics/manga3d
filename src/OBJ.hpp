@@ -100,7 +100,7 @@ namespace Obj{
             v0 = ax * by - ay * bx;
             v1 = bx * cy - by * cx;
             v2 = cx * ay - cy * ax;
-            return v0 < 0 && v1 < 0 && v2 < 0;
+            return v0 < EPSILON && v1 < EPSILON && v2 < EPSILON;
         }
         Vector3f get_barycentric_coordinate(int x, int y) const{
             float alpha, beta, gama;
@@ -150,7 +150,11 @@ namespace Obj{
         vertex_list,edge_list,triangle_list have elements allocated on the heap
         use `clear_heap()` to delete them
         */
-        ObjSet(const std::string obj_path){
+        ObjSet(const std::string& obj_path, const std::string& tex_path){
+            if(tex_path != ""){
+                this->texture = Tex::Texture(tex_path);
+            }
+
             std::vector<ObjFile::v> raw_v;
             std::vector<ObjFile::vt> raw_vt;
             std::vector<ObjFile::vn> raw_vn;

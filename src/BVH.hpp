@@ -3,6 +3,8 @@
 #include "global.hpp"
 #include "OBJ.hpp"
 
+
+
 namespace BVH{
     using namespace Eigen;
     class BBox{
