@@ -18,7 +18,7 @@ public:
         BLACKWHITEALPHA = 2,
         BLACKWHITE = 1
     };
-    std::string imgcolor_2_string(ImageColor color) const{
+    friend std::string imgcolor_2_string(ImageColor color){
         switch(color){
         case ImageColor::FULLCOLORALPHA:
             return "FULLCOLORALPHA";
@@ -108,7 +108,6 @@ public:
         }
         return false;
     }
-
     Color operator*(float f) const{
         Color result(*this);
         if(result.image_color == ImageColor::BLACKWHITE || result.image_color == ImageColor::BLACKWHITEALPHA){
@@ -120,6 +119,46 @@ public:
             result.color[2] *= f;
         }
         return result;
+    }
+    Color operator*=(float f) const{
+        if(this->image_color == ImageColor::BLACKWHITE || this->image_color == ImageColor::BLACKWHITEALPHA){
+            this->color[0] *= f;
+        }
+        else{
+            this->color[0] *= f;
+            this->color[1] *= f;
+            this->color[2] *= f;
+        }
+        return *this;
+    }
+    Color operator*(Color col) const{
+        Color result(*this);
+        if(this->image_color != col.image_color){
+            throw Manga3DException("Unmatch Raster::Color(" + imgcolor_2_string(this->image_color) + ") * Raster::Color(" + imgcolor_2_string(col.image_color) + ")");
+        }
+        for(int i = 0;i < (int)this->image_color;i++){
+            result.color[i] *= col.color[i]; 
+        }
+        return result;
+    }
+    Color operator+(Color col) const{
+        Color result(*this);
+        if(this->image_color != col.image_color){
+            throw Manga3DException("Unmatch Raster::Color(" + imgcolor_2_string(this->image_color) + ") + Raster::Color(" + imgcolor_2_string(col.image_color) + ")");
+        }
+        for(int i = 0;i < (int)this->image_color;i++){
+            result.color[i] += col.color[i]; 
+        }
+        return result;
+    }
+    Color operator+=(Color col) const{
+        if(this->image_color != col.image_color){
+            throw Manga3DException("Unmatch Raster::Color(" + imgcolor_2_string(this->image_color) + ") + Raster::Color(" + imgcolor_2_string(col.image_color) + ")");
+        }
+        for(int i = 0;i < (int)this->image_color;i++){
+            this->color[i] += col.color[i]; 
+        }
+        return *this;
     }
 
     inline void color_assign_fullcoloralpha(float* buff) const{

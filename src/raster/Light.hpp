@@ -24,6 +24,7 @@ public:
     virtual void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position){}
     virtual void cast_shadow(std::vector<Obj::ObjSet*>& obj_set, bool verbose = false){}
     virtual inline Eigen::Vector3f get_l(Eigen::Vector3f& obj_position){ return Eigen::Vector3f(); }
+    virtual inline float get_I(float distance){ return 0; }
 };
 
 class Raster::PointLight: public Raster::Light{
@@ -34,25 +35,27 @@ public:
         this->camera.config(Raster::Camera::Projection::PERSP, bg_color, w, w, fovY, position, lookat);
     }
     void cast_shadow(std::vector<Obj::ObjSet*>& obj_set, bool verbose = false){
-        this->camera.paint_simple(obj_set, camera.bg_color, camera.bg_color, 1, Raster::Camera::PaintSimpleOpt::SHADOW, false, verbose);
+        this->camera.paint_simple(obj_set, camera.bg_color, camera.bg_color, 1, Raster::Camera::PaintSimpleOpt::SHADOW, true, false, verbose);
     }
     inline Eigen::Vector3f get_l(Eigen::Vector3f& obj_position){
         return (this->camera.position - obj_position).normalized();
     }
+    inline float get_I(float distance){ return this->I / (distance * distance); }
 };
 
 class Raster::SunLight: public Raster::Light{
 public:
     SunLight(float I): Light(I){}
     void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position){
-        Eigen::Vector3f true_position = -position * 10;
+        Eigen::Vector3f true_position = -position;
         this->camera.config(Raster::Camera::Projection::ORTHO, bg_color, w, w, fovY, true_position, position);
     }
     void cast_shadow(std::vector<Obj::ObjSet*>& obj_set, bool verbose = false){
-        camera.paint_simple(obj_set, camera.bg_color, camera.bg_color, 1, Raster::Camera::PaintSimpleOpt::SHADOW, false, verbose);
+        camera.paint_simple(obj_set, camera.bg_color, camera.bg_color, 1, Raster::Camera::PaintSimpleOpt::SHADOW, true, false, verbose);
     }
     inline Eigen::Vector3f get_l(Eigen::Vector3f& obj_position){
         return (-this->camera.lookat_g);
     }
+    inline float get_I(float distance){ return this->I; }
 };
 

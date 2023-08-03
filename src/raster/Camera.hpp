@@ -324,7 +324,7 @@ public:
 
 
 
-    void project_vertices(std::vector<Obj::ObjSet*>& obj_set, bool verbose = false){
+    void project_vertices(std::vector<Obj::ObjSet*>& obj_set, bool verbose){
         for(Obj::ObjSet* obj : obj_set){
             int i = 0;
             for(Obj::Vertex* vertex : obj->vertices){
@@ -347,7 +347,7 @@ public:
     }
 
 
-    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Raster::Color& color, const int thickness = 2){
+    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Raster::Color& color, const int thickness){
         int dim = 0;
         if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
             dim = 1;
@@ -402,9 +402,9 @@ public:
         }
     }
     inline void paint_line_simple(const Obj::Edge* edge, const Raster::Color& color){
-        paint_line_simple(edge->start->projected_position, edge->end->projected_position, color);
+        paint_line_simple(edge->start->projected_position, edge->end->projected_position, color, 2);
     }
-    void paint_frame_simple(std::vector<Obj::ObjSet*>& obj_set, Raster::Color color, bool verbose = false){
+    void paint_frame_simple(std::vector<Obj::ObjSet*>& obj_set, Raster::Color color, bool verbose){
         this->init_buffs();
         int i = 0;
         project_vertices(obj_set, verbose);
@@ -429,13 +429,39 @@ public:
         }
     }
 
+    Raster::Color get_texture_color(Raster::Color default_color, Obj::ObjSet* obj, Obj::Triangle* triangle, Eigen::Vector3f& bc_coord){
+        Raster::Color color = default_color;
+        if(obj->texture.has_value()){
+            float u, v;
+            Eigen::Vector2f uv = triangle->get_uv_from_barycentric(bc_coord);
+            u = uv[0];
+            v = uv[1];
+            Eigen::Vector3f tex_color = obj->texture.value().bilinear_sampling(u, v);
+            switch(color.image_color){
+            case Raster::Color::ImageColor::FULLCOLORALPHA:
+                color = Raster::Color(tex_color[0], tex_color[1], tex_color[2], 1);
+                break;
+            case Raster::Color::ImageColor::FULLCOLOR:
+                color = Raster::Color(tex_color[0], tex_color[1], tex_color[2]);
+                break;
+            case Raster::Color::ImageColor::BLACKWHITEALPHA:
+                color = Raster::Color(tex_color[1], 1);
+                break;
+            default:
+                color = Raster::Color(tex_color[1]);
+                break;
+            }
+        }
+        return color;
+    }
+
     /*opt = outline, texture, shadow */
     enum class PaintSimpleOpt{
         OUTLINE,
         TEXTURE,
         SHADOW
     };
-    void paint_simple(std::vector<Obj::ObjSet*>& obj_set, const Raster::Color& line_color, Raster::Color& fill_color, float crease_angle = 1, PaintSimpleOpt opt = PaintSimpleOpt::OUTLINE, bool paint_back = false, bool do_outline = true, bool verbose = false){
+    void paint_simple(std::vector<Obj::ObjSet*>& obj_set, const Raster::Color& line_color, Raster::Color& fill_color, float crease_angle, PaintSimpleOpt opt, bool paint_back, bool do_outline, bool verbose){
         this->init_buffs();
         int i = 0;
         project_vertices(obj_set, verbose);
@@ -497,6 +523,10 @@ public:
                                     continue;
                                 }
                                 *z_p = z;
+                                if(verbose){
+                                    float* top_p = this->get_top_buff_trust(x, y);
+                                    color_assign(fill_color * (-z / (this->position.norm() * 3)), top_p);
+                                }
                                 continue;
                             }
 
@@ -510,32 +540,7 @@ public:
                                 color_assign(fill_color, top_p);
                             }
                             else if(opt == PaintSimpleOpt::TEXTURE){
-                                Raster::Color color = fill_color;
-                                if(obj->texture.has_value()){
-                                    float u, v;
-                                    try{
-                                        u = bc_coord.dot(Eigen::Vector3f(triangle->A_texture_uv.value()[0], triangle->B_texture_uv.value()[0], triangle->C_texture_uv.value()[0]));
-                                        v = bc_coord.dot(Eigen::Vector3f(triangle->A_texture_uv.value()[1], triangle->B_texture_uv.value()[1], triangle->C_texture_uv.value()[1]));
-                                    }
-                                    catch(const std::bad_optional_access& e){
-                                        throw Manga3DException("Raster::Rasterizer::paint_simple(): triangle uv lost", e);
-                                    }
-                                    Eigen::Vector3f tex_color = obj->texture.value().bilinear_sampling(u, v);
-                                    switch(color.image_color){
-                                    case Raster::Color::ImageColor::FULLCOLORALPHA:
-                                        color = Raster::Color(tex_color[0], tex_color[1], tex_color[2], 1);
-                                        break;
-                                    case Raster::Color::ImageColor::FULLCOLOR:
-                                        color = Raster::Color(tex_color[0], tex_color[1], tex_color[2]);
-                                        break;
-                                    case Raster::Color::ImageColor::BLACKWHITEALPHA:
-                                        color = Raster::Color(tex_color[1], 1);
-                                        break;
-                                    default:
-                                        color = Raster::Color(tex_color[1]);
-                                        break;
-                                    }
-                                }
+                                Raster::Color color = get_texture_color(fill_color, obj,triangle,bc_coord);
                                 float* top_p = this->get_top_buff_trust(x, y);
                                 color_assign(color, top_p);
                             }
