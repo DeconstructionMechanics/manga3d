@@ -108,6 +108,14 @@ namespace Obj{
             gama = 1 - alpha - beta;
             return Vector3f(alpha, beta, gama);
         }
+
+        Vector3f get_position_from_barycentric(Vector3f& barycentric){
+            Vector3f position;
+            position << barycentric.dot(Vector3f(this->A->position[0], this->B->position[0], this->C->position[0])),
+                barycentric.dot(Vector3f(this->A->position[1], this->B->position[1], this->C->position[1])),
+                barycentric.dot(Vector3f(this->A->position[2], this->B->position[2], this->C->position[2]));
+            return position;
+        }
     };
 
     bool Edge::is_crease(float angle) const{

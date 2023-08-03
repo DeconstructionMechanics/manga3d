@@ -27,7 +27,7 @@ public:
     Raster::Color bg_color;
     int w;
     int h;
-private:
+
     float fovY;
     Eigen::Vector3f position;
     Eigen::Vector3f lookat_g; // must be normalized()
@@ -36,7 +36,6 @@ private:
     float far;
 
     float* z_buff;
-public:
     float* top_buff;
 
     /*
@@ -44,6 +43,10 @@ public:
     use `delete_buff()` to delete them
     */
     inline void alloc_buff(){
+        if(w <= 0 || h <= 0){
+            throw Manga3DException("Raster::Camera::alloc_buff(): illegal w,h");
+        }
+
         if(z_buff){
             throw Manga3DException("Raster::Camera::alloc_buff(): memory leak z_buff");
         }
@@ -51,9 +54,6 @@ public:
 
         if(top_buff){
             throw Manga3DException("Raster::Camera::alloc_buff(): memory leak top_buff");
-        }
-        if(w <= 0 || h <= 0){
-            throw Manga3DException("Raster::Camera::alloc_buff(): illegal w,h");
         }
         top_buff = new float[w * h * (int)bg_color.image_color];
     }
@@ -90,19 +90,22 @@ public:
         }
     }
 
-    inline float* get_buff(Eigen::Vector3f ind, float* buff, int channel) const{
+    template<typename T>
+    inline T* get_buff(Eigen::Vector3f ind, T* buff, int channel) const{
         if(top_buff == NULL || ind[2] > 0){
             return nullptr;
         }
-        return get_buff((int)ind[0], (int)ind[1], buff, channel);
+        return get_buff<T>((int)ind[0], (int)ind[1], buff, channel);
     }
-    inline float* get_buff(int x, int y, float* buff, int channel) const{
+    template<typename T>
+    inline T* get_buff(int x, int y, T* buff, int channel) const{
         if(x < 0 || x >= this->w || y < 0 || y >= this->h){
             return nullptr;
         }
-        return get_buff_trust(x, y, buff, channel);
+        return get_buff_trust<T>(x, y, buff, channel);
     }
-    inline float* get_buff_trust(int x, int y, float* buff, int channel) const{
+    template<typename T>
+    inline T* get_buff_trust(int x, int y, T* buff, int channel) const{
         int index = x + y * this->w;
         if(channel > 1){
             index *= channel;
@@ -110,22 +113,22 @@ public:
         return &(buff[index]);
     }
     inline float* get_top_buff(Eigen::Vector3f ind) const{
-        return get_buff((int)ind[0], (int)ind[1], this->top_buff, (int)this->bg_color.image_color);
+        return get_buff<float>((int)ind[0], (int)ind[1], this->top_buff, (int)this->bg_color.image_color);
     }
     inline float* get_top_buff(int x, int y) const{
-        return get_buff(x, y, this->top_buff, (int)this->bg_color.image_color);
+        return get_buff<float>(x, y, this->top_buff, (int)this->bg_color.image_color);
     }
     inline float* get_top_buff_trust(int x, int y) const{
-        return get_buff_trust(x, y, this->top_buff, (int)this->bg_color.image_color);
+        return get_buff_trust<float>(x, y, this->top_buff, (int)this->bg_color.image_color);
     }
     inline float* get_z_buff(Eigen::Vector3f ind) const{
-        return get_buff((int)ind[0], (int)ind[1], this->z_buff, 1);
+        return get_buff<float>((int)ind[0], (int)ind[1], this->z_buff, 1);
     }
     inline float* get_z_buff(int x, int y) const{
-        return get_buff(x, y, this->z_buff, 1);
+        return get_buff<float>(x, y, this->z_buff, 1);
     }
     inline float* get_z_buff_trust(int x, int y) const{
-        return get_buff_trust(x, y, this->z_buff, 1);
+        return get_buff_trust<float>(x, y, this->z_buff, 1);
     }
 
 private:
@@ -141,7 +144,7 @@ private:
     std::optional<Eigen::Matrix4f> fisheyeviewport_matrix_cache; //w h fov
 
 public:
-    void config(Projection projection_type, Raster::Color bg_color, int w, int h, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat_g, float up_t = 0, float near = 0.0001, float far = 10000){
+    void config(Projection projection_type, Raster::Color& bg_color, int w, int h, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat_g, float up_t = 0, float near = DEFAULT_NEAR, float far = DEFAULT_FAR){
         this->projection_type = projection_type;
         if(this->bg_color.image_color != bg_color.image_color || this->w != w || this->h != h){
             delete_buff();
@@ -272,9 +275,6 @@ public:
         }
 
     }
-    inline void config(float fovY, Eigen::Vector3f position, Eigen::Vector3f lookat_g){
-        config(this->projection_type, this->bg_color, this->w, this->h, this->fovY, position, lookat_g);
-    }
 
     void projection(Eigen::Vector3f& point_position) const{
         Eigen::Vector4f point_position_h = point_position.homogeneous();
@@ -315,6 +315,259 @@ public:
             break;
         }
         point_position = point_position_h.hnormalized();
+    }
+
+
+
+
+
+
+
+
+    void project_vertices(std::vector<Obj::ObjSet*>& obj_set, bool verbose = false){
+        for(Obj::ObjSet* obj : obj_set){
+            int i = 0;
+            for(Obj::Vertex* vertex : obj->vertices){
+                vertex->projected_position = vertex->position;
+                this->projection(vertex->projected_position);
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->vertices.size()){
+                        print_progress(i, obj->vertices.size(), "Project vertex");
+                    }
+                }
+            }
+            if(verbose){
+                std::cout << std::endl;
+            }
+        }
+        if(verbose){
+            std::cout << "End project vertex" << std::endl;
+        }
+    }
+
+
+    void paint_line_simple(const Eigen::Vector3f& a, const Eigen::Vector3f& b, const Raster::Color& color, const int thickness = 2){
+        int dim = 0;
+        if(std::abs(a[1] - b[1]) > std::abs(a[0] - b[0])){
+            dim = 1;
+        };
+        if(equal(a[dim], b[dim])){
+            return;
+        }
+        Eigen::Vector3f leftp;
+        Eigen::Vector3f rightp;
+        if(a[dim] < b[dim]){
+            leftp = a;
+            rightp = b;
+        }
+        else{
+            leftp = b;
+            rightp = a;
+        }
+        Eigen::Vector3f i = (rightp - leftp).normalized();
+        float x2y2 = 1 - i[2] * i[2];
+        if(x2y2 == 0){
+            return;
+        }
+        i /= std::sqrt(x2y2);
+        for(;leftp[dim] < rightp[dim] + 0.5;leftp += i){
+            std::vector<Eigen::Vector3f> positions;
+            positions.push_back(leftp);
+            if(thickness > 1){
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1, leftp[1], leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0], leftp[1] + 1, leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1, leftp[1] + 1, leftp[2]));
+            }
+            if(thickness > 2){
+                positions.push_back(Eigen::Vector3f(leftp[0] - 1, leftp[1], leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] - 1, leftp[1] + 1, leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0], leftp[1] - 1, leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1, leftp[1] - 1, leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 2, leftp[1], leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 2, leftp[1] + 1, leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0], leftp[1] + 2, leftp[2]));
+                positions.push_back(Eigen::Vector3f(leftp[0] + 1, leftp[1] + 2, leftp[2]));
+            }
+            for(Eigen::Vector3f& position : positions){
+                float* pixel_ptr = this->get_top_buff(position);
+                float* z_ptr = this->get_z_buff(position);
+                if(pixel_ptr && z_ptr){
+                    if(no_less_than(leftp[2], *z_ptr)){
+                        *z_ptr = leftp[2];
+                        color_assign(color, pixel_ptr);
+                    }
+                }
+            }
+        }
+    }
+    inline void paint_line_simple(const Obj::Edge* edge, const Raster::Color& color){
+        paint_line_simple(edge->start->projected_position, edge->end->projected_position, color);
+    }
+    void paint_frame_simple(std::vector<Obj::ObjSet*>& obj_set, Raster::Color color, bool verbose = false){
+        this->init_buffs();
+        int i = 0;
+        project_vertices(obj_set, verbose);
+
+        for(Obj::ObjSet* obj : obj_set){
+            i = 0;
+            for(Obj::Edge* edge : obj->edges){
+                paint_line_simple(edge, color);
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->edges.size()){
+                        print_progress(i, obj->edges.size(), "Paint edge");
+                    }
+                }
+            }
+            if(verbose){
+                std::cout << std::endl;
+            }
+        }
+        if(verbose){
+            std::cout << "End paint_frame_simple()" << std::endl;
+        }
+    }
+
+    /*opt = outline, texture, shadow */
+    enum class PaintSimpleOpt{
+        OUTLINE,
+        TEXTURE,
+        SHADOW
+    };
+    void paint_simple(std::vector<Obj::ObjSet*>& obj_set, const Raster::Color& line_color, Raster::Color& fill_color, float crease_angle = 1, PaintSimpleOpt opt = PaintSimpleOpt::OUTLINE, bool paint_back = false, bool do_outline = true, bool verbose = false){
+        this->init_buffs();
+        int i = 0;
+        project_vertices(obj_set, verbose);
+
+        for(Obj::ObjSet* obj : obj_set){
+            i = 0;
+            for(Obj::Triangle* triangle : obj->triangles){
+                triangle->calculate_normal();
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->triangles.size()){
+                        print_progress(i, obj->triangles.size(), "Triangle normal calculation");
+                    }
+                }
+            }
+            if(verbose){
+                std::cout << std::endl;
+            }
+        }
+        if(verbose){
+            std::cout << "Triangle normal calculated" << std::endl;
+        }
+        for(Obj::ObjSet* obj : obj_set){
+            i = 1;
+            for(Obj::Triangle* triangle : obj->triangles){
+                if(verbose){
+                    i++;
+                    if(i % 100 == 0 || i == obj->triangles.size()){
+                        print_progress(i, obj->triangles.size(), "Triangle rasterizing");
+                    }
+                }
+                if(!paint_back && triangle->normal.value().z() < 0){
+                    continue;
+                }
+                if(triangle->A->projected_position[2] > 0 && triangle->B->projected_position[2] > 0 && triangle->C->projected_position[2] > 0){
+                    continue;
+                }
+                float l, r, u, d;
+                l = min(triangle->A->projected_position[0], triangle->B->projected_position[0], triangle->C->projected_position[0]) - 1;
+                r = max(triangle->A->projected_position[0], triangle->B->projected_position[0], triangle->C->projected_position[0]) + 1;
+                u = min(triangle->A->projected_position[1], triangle->B->projected_position[1], triangle->C->projected_position[1]) - 1;
+                d = max(triangle->A->projected_position[1], triangle->B->projected_position[1], triangle->C->projected_position[1]) + 1;
+                maximize(l, 0);
+                minimize(r, this->w - 0.9);
+                maximize(u, 0);
+                minimize(d, this->h - 0.9);
+                if(l > r || u > d){
+                    continue;
+                }
+                for(int y = u;y < d;y++){
+                    for(int x = l;x < r;x++){
+                        if(triangle->is_inside_triangle(x, y)){
+                            Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
+                            float* z_p = this->get_z_buff_trust(x, y);
+                            if(opt == PaintSimpleOpt::SHADOW){
+                                Eigen::Vector3f point = triangle->get_position_from_barycentric(bc_coord);
+                                float z = -(point - this->position).norm();
+                                if(z < *z_p){
+                                    continue;
+                                }
+                                *z_p = z;
+                                continue;
+                            }
+
+                            float z = bc_coord.dot(Eigen::Vector3f(triangle->A->projected_position[2], triangle->B->projected_position[2], triangle->C->projected_position[2]));
+                            if(z > 0 || z < *z_p){
+                                continue;
+                            }
+                            *z_p = z;
+                            if(opt == PaintSimpleOpt::OUTLINE){
+                                float* top_p = this->get_top_buff_trust(x, y);
+                                color_assign(fill_color, top_p);
+                            }
+                            else if(opt == PaintSimpleOpt::TEXTURE){
+                                Raster::Color color = fill_color;
+                                if(obj->texture.has_value()){
+                                    float u, v;
+                                    try{
+                                        u = bc_coord.dot(Eigen::Vector3f(triangle->A_texture_uv.value()[0], triangle->B_texture_uv.value()[0], triangle->C_texture_uv.value()[0]));
+                                        v = bc_coord.dot(Eigen::Vector3f(triangle->A_texture_uv.value()[1], triangle->B_texture_uv.value()[1], triangle->C_texture_uv.value()[1]));
+                                    }
+                                    catch(const std::bad_optional_access& e){
+                                        throw Manga3DException("Raster::Rasterizer::paint_simple(): triangle uv lost", e);
+                                    }
+                                    Eigen::Vector3f tex_color = obj->texture.value().bilinear_sampling(u, v);
+                                    switch(color.image_color){
+                                    case Raster::Color::ImageColor::FULLCOLORALPHA:
+                                        color = Raster::Color(tex_color[0], tex_color[1], tex_color[2], 1);
+                                        break;
+                                    case Raster::Color::ImageColor::FULLCOLOR:
+                                        color = Raster::Color(tex_color[0], tex_color[1], tex_color[2]);
+                                        break;
+                                    case Raster::Color::ImageColor::BLACKWHITEALPHA:
+                                        color = Raster::Color(tex_color[1], 1);
+                                        break;
+                                    default:
+                                        color = Raster::Color(tex_color[1]);
+                                        break;
+                                    }
+                                }
+                                float* top_p = this->get_top_buff_trust(x, y);
+                                color_assign(color, top_p);
+                            }
+                        }
+                    }
+                }
+
+                if(opt == PaintSimpleOpt::OUTLINE || do_outline){
+                    bool outline_AB = false;
+                    bool outline_BC = false;
+                    bool outline_CA = false;
+                    outline_AB |= (triangle->AB->is_boundary() || triangle->AB->is_silhouette());
+                    outline_BC |= (triangle->BC->is_boundary() || triangle->BC->is_silhouette());
+                    outline_CA |= (triangle->CA->is_boundary() || triangle->CA->is_silhouette());
+                    outline_AB |= triangle->AB->is_crease(crease_angle);
+                    outline_BC |= triangle->BC->is_crease(crease_angle);
+                    outline_CA |= triangle->CA->is_crease(crease_angle);
+                    if(outline_AB){
+                        paint_line_simple(triangle->AB, line_color);
+                    }
+                    if(outline_BC){
+                        paint_line_simple(triangle->BC, line_color);
+                    }
+                    if(outline_CA){
+                        paint_line_simple(triangle->CA, line_color);
+                    }
+                }
+            }
+            if(verbose){
+                std::cout << std::endl;
+            }
+        }
     }
 
 };

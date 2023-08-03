@@ -16,6 +16,10 @@
 #define MIN_F 1.17549435082228750796873653722224568e-38F
 #define MAX_F 3.40282346638528859811704183484516925e+38F
 
+
+#define DEFAULT_NEAR 0.0001
+#define DEFAULT_FAR 10000
+
 inline void minimize(float& min, const float a){
     if(a < min){
         min = a;

@@ -97,6 +97,31 @@ public:
         return *this;
     }
 
+    inline bool operator!=(Color& compare_color){
+        if(this->image_color == compare_color.image_color){
+            for(int i = 0;i < (int)this->image_color;i++){
+                if(this->color[i] != compare_color.color[i]){
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    Color operator*(float f) const{
+        Color result(*this);
+        if(result.image_color == ImageColor::BLACKWHITE || result.image_color == ImageColor::BLACKWHITEALPHA){
+            result.color[0] *= f;
+        }
+        else{
+            result.color[0] *= f;
+            result.color[1] *= f;
+            result.color[2] *= f;
+        }
+        return result;
+    }
+
     inline void color_assign_fullcoloralpha(float* buff) const{
         if(this->image_color != ImageColor::FULLCOLORALPHA){
             throw Manga3DException("Color assignment unmatch, expect FULLCOLORALPHA, get " + imgcolor_2_string(image_color));
@@ -144,16 +169,6 @@ public:
         }
     }
 
-    inline bool operator!=(Color& compare_color){
-        if(this->image_color == compare_color.image_color){
-            for(int i = 0;i < (int)this->image_color;i++){
-                if(this->color[i] != compare_color.color[i]){
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
+
 };
 

@@ -50,6 +50,7 @@ void show_image(Raster::Rasterizer& raster, std::optional<std::string> filename 
 }
 
 int main(){
+    
     Raster::Color bg_color(1,1,1, 0);
     Raster::Color line_color(0,0,0, 1);
     Raster::Color fill_color(1,1,1, 1);
@@ -57,17 +58,20 @@ int main(){
     Raster::Rasterizer rasterizer(".\\model\\monkey\\monkey.obj", ".\\model\\monkey\\color.png");
     // Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj", ".\\model\\cow\\spot_texture.png");
     std::cout << "load complete" << std::endl;
+    rasterizer.add_light(Raster::Rasterizer::LightType::POINTLIGHT,1,Raster::Color(1,1,1,1),1024,PI / 2,Eigen::Vector3f(1,4,4));
+    // rasterizer.add_light(Raster::Rasterizer::LightType::SUNLIGHT,1,Raster::Color(1,1,1,1),1024,PI / 2,Eigen::Vector3f(0,-1,0));
+    rasterizer.shadow_bake();
 
     Eigen::Vector3f position(0.001, 0, 5);
     Eigen::Vector3f lookat(0, 0,-1);
-    rasterizer.camera.config(Raster::Camera::Projection::PERSP, bg_color, 900, 600, PI / 2, position, lookat);
+    rasterizer.config_camera(Raster::Camera::Projection::PERSP, bg_color, 900, 600, PI / 2, position, lookat);
 
     std::cout << "rendering" << std::endl;
     // rasterizer.paint_frame_simple(line_color,true);
-    rasterizer.paint_simple(line_color, fill_color, 1, "texture", true);
+    rasterizer.paint_shadow(fill_color);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer, "monkey");//, "monkeyframe");
+    show_image(rasterizer, "monkey_shadow");//, "monkeyframe");
 
 
     return 0;
