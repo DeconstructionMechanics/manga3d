@@ -1,6 +1,9 @@
 # manga3d
 manga style 3d renderer. under construction
 
+## latest demo
+![](output/monkey.png)
+
 `rasterizer.paint_frame_simple();`
 ![](output/frame.png)
 
