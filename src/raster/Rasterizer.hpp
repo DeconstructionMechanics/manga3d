@@ -4,7 +4,8 @@
 #include "../obj/OBJ.hpp"
 #include "../Color.hpp"
 #include "Light.hpp"
-#include "CameraView.hpp"
+#include "Camera.hpp"
+#include "ShaderAdv.hpp"
 
 namespace Raster{
     class Rasterizer;
@@ -20,7 +21,7 @@ public:
     std::vector<Obj::ObjSet*> obj_set;
 
     std::vector<Raster::Light*> lights;
-    Raster::CameraView camera;
+    Raster::Camera camera;
 
 
     /*
@@ -92,20 +93,23 @@ public:
             std::cout << "End paint_frame_simple()" << std::endl;
         }
     }
-    inline void paint_outline_simple(const Raster::Color line_color, Raster::Color fill_color, float crease_angle = 1, bool paint_back = false, bool verbose = false){
-        camera.paint_simple(this->obj_set, line_color, fill_color, crease_angle, Raster::Camera::PaintSimpleOpt::OUTLINE, paint_back, true, verbose);
+    inline void paint_outline_simple(Raster::Color line_color, Raster::Color fill_color, int thickness = 2, float crease_angle = 1, int crease_thickness = 1, bool paint_back = false, bool verbose = false){
+        Raster::OutlineShader outline_shader(thickness, crease_angle, crease_thickness, line_color);
+        camera.paint(outline_shader, this->obj_set, fill_color, paint_back, verbose);
         if(verbose){
             std::cout << "End paint_outline_simple()" << std::endl;
         }
     }
-    inline void paint_texture_simple(const Raster::Color line_color, Raster::Color fill_color, float crease_angle = 1, bool paint_back = false, bool do_outline = true, bool verbose = false){
-        camera.paint_simple(this->obj_set, line_color, fill_color, crease_angle, Raster::Camera::PaintSimpleOpt::TEXTURE, paint_back, do_outline, verbose);
+    inline void paint_texture_simple(Raster::Color fill_color, bool paint_back = false, bool verbose = false){
+        Raster::TextureShader texture_shader;
+        camera.paint(texture_shader, this->obj_set, fill_color, paint_back, verbose);
         if(verbose){
             std::cout << "End paint_texture_simple()" << std::endl;
         }
     }
-    inline void paint_phoneshading(const Raster::Color shadow_color, float shadow_bias = 0.05, bool pcf = false, bool paint_back = false, bool verbose = false){
-        camera.paint(Raster::CameraView::PaintOpt::PHONESHADING, this->obj_set, this->lights, shadow_color, shadow_bias, pcf, paint_back, verbose);
+    inline void paint_phoneshading(const Raster::Color fill_color, float shadow_bias = 0.05, bool pcf = false, bool paint_back = false, bool verbose = false){
+        PhoneShader phone_shader(lights, shadow_bias, pcf);
+        camera.paint(phone_shader, this->obj_set, fill_color, paint_back, verbose);
         if(verbose){
             std::cout << "End paint_phoneshading()" << std::endl;
         }

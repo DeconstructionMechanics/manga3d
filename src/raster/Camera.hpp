@@ -2,6 +2,7 @@
 
 #include "../global.hpp"
 #include "../Color.hpp"
+#include "Shader.hpp"
 
 
 
@@ -401,8 +402,8 @@ public:
             }
         }
     }
-    inline void paint_line_simple(const Obj::Edge* edge, const Raster::Color& color){
-        paint_line_simple(edge->start->projected_position, edge->end->projected_position, color, 2);
+    inline void paint_line_simple(const Obj::Edge* edge, const Raster::Color& color, const int thickness = 2){
+        paint_line_simple(edge->start->projected_position, edge->end->projected_position, color, thickness);
     }
     void paint_frame_simple(std::vector<Obj::ObjSet*>& obj_set, Raster::Color color, bool verbose){
         this->init_buffs();
@@ -429,39 +430,13 @@ public:
         }
     }
 
-    Raster::Color get_texture_color(const Raster::Color& default_color, const Obj::ObjSet* obj, const Obj::Triangle* triangle, const Eigen::Vector3f& bc_coord){
-        Raster::Color color = default_color;
-        if(obj->texture.has_value()){
-            float u, v;
-            Eigen::Vector2f uv = triangle->get_uv_from_barycentric(bc_coord);
-            u = uv[0];
-            v = uv[1];
-            Eigen::Vector3f tex_color = obj->texture.value().bilinear_sampling(u, v);
-            switch(color.image_color){
-            case Raster::Color::ImageColor::FULLCOLORALPHA:
-                color = Raster::Color(tex_color[0], tex_color[1], tex_color[2], 1);
-                break;
-            case Raster::Color::ImageColor::FULLCOLOR:
-                color = Raster::Color(tex_color[0], tex_color[1], tex_color[2]);
-                break;
-            case Raster::Color::ImageColor::BLACKWHITEALPHA:
-                color = Raster::Color(tex_color[1], 1);
-                break;
-            default:
-                color = Raster::Color(tex_color[1]);
-                break;
-            }
-        }
-        return color;
-    }
+    
+    void paint(Raster::Shader& shader,
+        const std::vector<Obj::ObjSet*>& obj_set,
+        const Raster::Color& fill_color,
+        const bool paint_back,
+        const bool verbose){
 
-    /*opt = outline, texture, shadow */
-    enum class PaintSimpleOpt{
-        OUTLINE,
-        TEXTURE,
-        SHADOW
-    };
-    void paint_simple(std::vector<Obj::ObjSet*>& obj_set, const Raster::Color& line_color, Raster::Color& fill_color, float crease_angle, PaintSimpleOpt opt, bool paint_back, bool do_outline, bool verbose){
         this->init_buffs();
         int i = 0;
         project_vertices(obj_set, verbose);
@@ -518,55 +493,52 @@ public:
                         }
                         Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
                         float* z_p = this->get_z_buff_trust(x, y);
-                        if(opt == PaintSimpleOpt::SHADOW){
-                            Eigen::Vector3f point = triangle->get_position_from_barycentric(bc_coord);
-                            float z = -(point - this->position).norm();
-                            if(z < *z_p){
-                                continue;
-                            }
-                            *z_p = z;
-                            if(verbose){
-                                float* top_p = this->get_top_buff_trust(x, y);
-                                color_assign(fill_color * (-z / (this->position.norm() * 3)), top_p);
-                            }
-                            continue;
-                        }
-
-                        float z = bc_coord.dot(Eigen::Vector3f(triangle->A->projected_position[2], triangle->B->projected_position[2], triangle->C->projected_position[2]));
-                        if(z > 0 || z < *z_p){
-                            continue;
-                        }
-                        *z_p = z;
-                        if(opt == PaintSimpleOpt::OUTLINE){
-                            float* top_p = this->get_top_buff_trust(x, y);
-                            color_assign(fill_color, top_p);
-                        }
-                        else if(opt == PaintSimpleOpt::TEXTURE){
-                            Raster::Color color = get_texture_color(fill_color, obj, triangle, bc_coord);
-                            float* top_p = this->get_top_buff_trust(x, y);
-                            color_assign(color, top_p);
-                        }
+                        float* top_p = this->get_top_buff_trust(x, y);
+                        shader.shade(obj, triangle, bc_coord, fill_color, z_p, top_p, verbose);
                     }
                 }
 
-                if(opt == PaintSimpleOpt::OUTLINE || do_outline){
+                if(shader.do_outline){
                     bool outline_AB = false;
                     bool outline_BC = false;
                     bool outline_CA = false;
                     outline_AB |= (triangle->AB->is_boundary() || triangle->AB->is_silhouette());
                     outline_BC |= (triangle->BC->is_boundary() || triangle->BC->is_silhouette());
                     outline_CA |= (triangle->CA->is_boundary() || triangle->CA->is_silhouette());
-                    outline_AB |= triangle->AB->is_crease(crease_angle);
-                    outline_BC |= triangle->BC->is_crease(crease_angle);
-                    outline_CA |= triangle->CA->is_crease(crease_angle);
-                    if(outline_AB){
-                        paint_line_simple(triangle->AB, line_color);
+
+                    bool crease_AB = false;
+                    bool crease_BC = false;
+                    bool crease_CA = false;
+                    try{
+                        crease_AB |= triangle->AB->is_crease(shader.crease_angle.value());
+                        crease_BC |= triangle->BC->is_crease(shader.crease_angle.value());
+                        crease_CA |= triangle->CA->is_crease(shader.crease_angle.value());
                     }
-                    if(outline_BC){
-                        paint_line_simple(triangle->BC, line_color);
+                    catch(const std::bad_optional_access& e){
+                        throw Manga3DException("Raster::Camera::paint(): shader crease_angle empty", e);
                     }
-                    if(outline_CA){
-                        paint_line_simple(triangle->CA, line_color);
+                    try{
+                        if(outline_AB){
+                            paint_line_simple(triangle->AB, shader.line_color.value(), shader.thickness.value());
+                        }
+                        else if(crease_AB){
+                            paint_line_simple(triangle->AB, shader.line_color.value(), shader.crease_thickness.value());
+                        }
+                        if(outline_BC){
+                            paint_line_simple(triangle->BC, shader.line_color.value(), shader.thickness.value());
+                        }
+                        else if(crease_BC){
+                            paint_line_simple(triangle->BC, shader.line_color.value(), shader.crease_thickness.value());
+                        }
+                        if(outline_CA){
+                            paint_line_simple(triangle->CA, shader.line_color.value(), shader.thickness.value());
+                        }
+                        else if(crease_CA){
+                            paint_line_simple(triangle->CA, shader.line_color.value(), shader.crease_thickness.value());
+                        }
+                    }
+                    catch(const std::bad_optional_access& e){
+                        throw Manga3DException("Raster::Camera::paint(): shader thickness or line_color empty", e);
                     }
                 }
             }
@@ -574,6 +546,7 @@ public:
                 std::cout << std::endl;
             }
         }
+        shader.post_shade(this->top_buff);
     }
 
 };

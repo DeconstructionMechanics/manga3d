@@ -137,7 +137,7 @@ public:
             throw Manga3DException("Unmatch Raster::Color(" + imgcolor_2_string(this->image_color) + ") * Raster::Color(" + imgcolor_2_string(col.image_color) + ")");
         }
         for(int i = 0;i < (int)this->image_color;i++){
-            result.color[i] *= col.color[i]; 
+            result.color[i] *= col.color[i];
         }
         return result;
     }
@@ -147,7 +147,7 @@ public:
             throw Manga3DException("Unmatch Raster::Color(" + imgcolor_2_string(this->image_color) + ") + Raster::Color(" + imgcolor_2_string(col.image_color) + ")");
         }
         for(int i = 0;i < (int)this->image_color;i++){
-            result.color[i] += col.color[i]; 
+            result.color[i] += col.color[i];
         }
         return result;
     }
@@ -156,7 +156,7 @@ public:
             throw Manga3DException("Unmatch Raster::Color(" + imgcolor_2_string(this->image_color) + ") + Raster::Color(" + imgcolor_2_string(col.image_color) + ")");
         }
         for(int i = 0;i < (int)this->image_color;i++){
-            this->color[i] += col.color[i]; 
+            this->color[i] += col.color[i];
         }
         return *this;
     }
@@ -206,6 +206,36 @@ public:
             color.color_assign_blackwhite(ptr);
             break;
         }
+    }
+
+    friend Raster::Color get_texture_color(const Raster::Color& default_color,
+        const Obj::ObjSet* obj,
+        const Obj::Triangle* triangle,
+        const Eigen::Vector3f& bc_coord){
+
+        Raster::Color color = default_color;
+        if(obj->texture.has_value()){
+            float u, v;
+            Eigen::Vector2f uv = triangle->get_uv_from_barycentric(bc_coord);
+            u = uv[0];
+            v = uv[1];
+            Eigen::Vector3f tex_color = obj->texture.value().bilinear_sampling(u, v);
+            switch(color.image_color){
+            case Raster::Color::ImageColor::FULLCOLORALPHA:
+                color = Raster::Color(tex_color[0], tex_color[1], tex_color[2], 1);
+                break;
+            case Raster::Color::ImageColor::FULLCOLOR:
+                color = Raster::Color(tex_color[0], tex_color[1], tex_color[2]);
+                break;
+            case Raster::Color::ImageColor::BLACKWHITEALPHA:
+                color = Raster::Color(tex_color[1], 1);
+                break;
+            default:
+                color = Raster::Color(tex_color[1]);
+                break;
+            }
+        }
+        return color;
     }
 
 
