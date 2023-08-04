@@ -117,18 +117,16 @@ public:
         }
     }
 
-    void fxaa(){
-        for(int y = 0; y < this->camera.h;y += 2){
-            for(int x = 0;x < this->camera.w;x += 2){
+    void simple_aa(){
+        for(int y = 1; y < this->camera.h - 1;y++){
+            for(int x = 1;x < this->camera.w - 1;x++){
                 Raster::Color xy(this->camera.bg_color.image_color,this->camera.get_top_buff(x,y));
                 Raster::Color x1y(this->camera.bg_color.image_color,this->camera.get_top_buff(x+1,y));
                 Raster::Color xy1(this->camera.bg_color.image_color,this->camera.get_top_buff(x,y+1));
-                Raster::Color x1y1(this->camera.bg_color.image_color,this->camera.get_top_buff(x+1,y+1));
-                bool xy_change;
-                bool x1y_change;
-                bool xy1_change;
-                bool x1y1_change;
-                
+                Raster::Color x0y(this->camera.bg_color.image_color,this->camera.get_top_buff(x-1,y));
+                Raster::Color xy0(this->camera.bg_color.image_color,this->camera.get_top_buff(x,y-1));
+                Raster::Color result = xy * 0.5 + x1y * 0.125 + xy1 * 0.125 + x0y * 0.125 + xy0 * 0.125; 
+                color_assign(result,this->camera.get_top_buff(x,y));
             }
         }
     }

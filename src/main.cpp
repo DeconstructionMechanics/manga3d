@@ -51,15 +51,16 @@ void show_image(Raster::Camera& camera, std::optional<std::string> filename = st
 
 int main(){
     
-    Raster::Color bg_color(1,1,1, 0);
-    Raster::Color line_color(0,0,0, 1);
-    Raster::Color fill_color(1,1,1, 1);
+    Raster::Color bg_color(1,1,1);
+    Raster::Color line_color(0,0,0);
+    Raster::Color fill_color(1,1,1);
+    Raster::Color light_color(1,1,1);
 
     Raster::Rasterizer rasterizer(".\\model\\monkey\\monkey.obj", ".\\model\\monkey\\color.png");
     // Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj", ".\\model\\cow\\spot_texture.png");
     std::cout << "load complete" << std::endl << std::endl;
-    rasterizer.add_light(Raster::Rasterizer::LightType::POINTLIGHT,20,Raster::Color(1,1,1,1),1024,PI / 2,Eigen::Vector3f(2,4,4));
-    // rasterizer.add_light(Raster::Rasterizer::LightType::SUNLIGHT,2,Raster::Color(1,1,1,1),1024,PI / 1.1,Eigen::Vector3f(1,0,0));
+    rasterizer.add_light(Raster::Rasterizer::LightType::POINTLIGHT,20,light_color,1024,PI / 2,Eigen::Vector3f(2,4,4));
+    // rasterizer.add_light(Raster::Rasterizer::LightType::SUNLIGHT,2,light_color,1024,PI / 1.1,Eigen::Vector3f(1,0,0));
     rasterizer.shadow_bake(true);
 
     Eigen::Vector3f position(-1, 0, 5);
@@ -69,6 +70,7 @@ int main(){
     std::cout << std::endl << "rendering" << std::endl << std::endl;
     // rasterizer.paint_frame_simple(line_color,true);
     rasterizer.paint_phoneshading(fill_color,0.05,false,false,true);
+    rasterizer.simple_aa();
 
     std::cout << std::endl << "showing image" << std::endl;
     show_image(rasterizer.camera, "monkey");
