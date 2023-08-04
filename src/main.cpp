@@ -68,10 +68,10 @@ int main(){
 
     std::cout << "rendering" << std::endl;
     // rasterizer.paint_frame_simple(line_color,true);
-    rasterizer.paint_shadow(fill_color,0.09,true);
+    rasterizer.paint_phoneshading(fill_color,0.09,true);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer.camera,"monkey");//, "monkeyframe");
+    show_image(rasterizer.camera);//, "monkeyframe");
 
 
     return 0;

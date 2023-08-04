@@ -324,7 +324,7 @@ public:
 
 
 
-    void project_vertices(std::vector<Obj::ObjSet*>& obj_set, bool verbose){
+    void project_vertices(const std::vector<Obj::ObjSet*>& obj_set, const bool verbose){
         for(Obj::ObjSet* obj : obj_set){
             int i = 0;
             for(Obj::Vertex* vertex : obj->vertices){
@@ -429,7 +429,7 @@ public:
         }
     }
 
-    Raster::Color get_texture_color(Raster::Color default_color, Obj::ObjSet* obj, Obj::Triangle* triangle, Eigen::Vector3f& bc_coord){
+    Raster::Color get_texture_color(const Raster::Color& default_color, const Obj::ObjSet* obj, const Obj::Triangle* triangle, const Eigen::Vector3f& bc_coord){
         Raster::Color color = default_color;
         if(obj->texture.has_value()){
             float u, v;
@@ -513,37 +513,38 @@ public:
                 }
                 for(int y = u;y < d;y++){
                     for(int x = l;x < r;x++){
-                        if(triangle->is_inside_triangle(x, y)){
-                            Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
-                            float* z_p = this->get_z_buff_trust(x, y);
-                            if(opt == PaintSimpleOpt::SHADOW){
-                                Eigen::Vector3f point = triangle->get_position_from_barycentric(bc_coord);
-                                float z = -(point - this->position).norm();
-                                if(z < *z_p){
-                                    continue;
-                                }
-                                *z_p = z;
-                                if(verbose){
-                                    float* top_p = this->get_top_buff_trust(x, y);
-                                    color_assign(fill_color * (-z / (this->position.norm() * 3)), top_p);
-                                }
-                                continue;
-                            }
-
-                            float z = bc_coord.dot(Eigen::Vector3f(triangle->A->projected_position[2], triangle->B->projected_position[2], triangle->C->projected_position[2]));
-                            if(z > 0 || z < *z_p){
+                        if(!triangle->is_inside_triangle(x, y)){
+                            continue;
+                        }
+                        Eigen::Vector3f bc_coord = triangle->get_barycentric_coordinate(x, y);
+                        float* z_p = this->get_z_buff_trust(x, y);
+                        if(opt == PaintSimpleOpt::SHADOW){
+                            Eigen::Vector3f point = triangle->get_position_from_barycentric(bc_coord);
+                            float z = -(point - this->position).norm();
+                            if(z < *z_p){
                                 continue;
                             }
                             *z_p = z;
-                            if(opt == PaintSimpleOpt::OUTLINE){
+                            if(verbose){
                                 float* top_p = this->get_top_buff_trust(x, y);
-                                color_assign(fill_color, top_p);
+                                color_assign(fill_color * (-z / (this->position.norm() * 3)), top_p);
                             }
-                            else if(opt == PaintSimpleOpt::TEXTURE){
-                                Raster::Color color = get_texture_color(fill_color, obj,triangle,bc_coord);
-                                float* top_p = this->get_top_buff_trust(x, y);
-                                color_assign(color, top_p);
-                            }
+                            continue;
+                        }
+
+                        float z = bc_coord.dot(Eigen::Vector3f(triangle->A->projected_position[2], triangle->B->projected_position[2], triangle->C->projected_position[2]));
+                        if(z > 0 || z < *z_p){
+                            continue;
+                        }
+                        *z_p = z;
+                        if(opt == PaintSimpleOpt::OUTLINE){
+                            float* top_p = this->get_top_buff_trust(x, y);
+                            color_assign(fill_color, top_p);
+                        }
+                        else if(opt == PaintSimpleOpt::TEXTURE){
+                            Raster::Color color = get_texture_color(fill_color, obj, triangle, bc_coord);
+                            float* top_p = this->get_top_buff_trust(x, y);
+                            color_assign(color, top_p);
                         }
                     }
                 }

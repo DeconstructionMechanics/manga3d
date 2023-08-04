@@ -109,14 +109,14 @@ namespace Obj{
             gama = 1 - alpha - beta;
             return Vector3f(alpha, beta, gama);
         }
-        inline Vector3f get_position_from_barycentric(Vector3f& barycentric){
+        inline Vector3f get_position_from_barycentric(const Vector3f& barycentric) const{
             Vector3f position;
             position << barycentric.dot(Vector3f(this->A->position[0], this->B->position[0], this->C->position[0])),
                 barycentric.dot(Vector3f(this->A->position[1], this->B->position[1], this->C->position[1])),
                 barycentric.dot(Vector3f(this->A->position[2], this->B->position[2], this->C->position[2]));
             return position;
         }
-        inline Vector2f get_uv_from_barycentric(Vector3f& barycentric){
+        inline Vector2f get_uv_from_barycentric(const Vector3f& barycentric) const{
             try{
                 Vector2f uv;
                 uv << barycentric.dot(Eigen::Vector3f(this->A_texture_uv.value()[0], this->B_texture_uv.value()[0], this->C_texture_uv.value()[0])),
@@ -127,7 +127,7 @@ namespace Obj{
                 throw Manga3DException("Obj::Triangle::get_uv_from_barycentric(): triangle X_texture_uv lost", e);
             }
         }
-        inline Vector3f get_normal_from_barycentric(Vector3f& barycentric){
+        inline Vector3f get_normal_from_barycentric(const Vector3f& barycentric) const{
             try{
                 Vector3f normal;
                 normal << barycentric.dot(Eigen::Vector3f(this->A_normal.value()[0], this->B_normal.value()[0], this->C_normal.value()[0])),

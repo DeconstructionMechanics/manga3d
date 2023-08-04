@@ -104,10 +104,10 @@ public:
             std::cout << "End paint_texture_simple()" << std::endl;
         }
     }
-    inline void paint_shadow(const Raster::Color shadow_color, float shadow_bias = 0.05, bool pcf = false, bool paint_back = false, bool verbose = false){
-        camera.paint_shadow(this->obj_set, this->lights, shadow_color, shadow_bias, pcf, paint_back, verbose);
+    inline void paint_phoneshading(const Raster::Color shadow_color, float shadow_bias = 0.05, bool pcf = false, bool paint_back = false, bool verbose = false){
+        camera.paint(Raster::CameraView::PaintOpt::PHONESHADING, this->obj_set, this->lights, shadow_color, shadow_bias, pcf, paint_back, verbose);
         if(verbose){
-            std::cout << "End paint_shadow()" << std::endl;
+            std::cout << "End paint_phoneshading()" << std::endl;
         }
     }
 };
