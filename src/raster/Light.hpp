@@ -16,11 +16,11 @@ namespace Raster{
 
 class Raster::SMShader: public Raster::Shader{
 public:
-    Eigen::Vector3f light_position;
+    std::function<float(Eigen::Vector3f& point_position)> get_distance;
 
-    SMShader(Eigen::Vector3f light_position): Shader(){
+    SMShader(std::function<float(Eigen::Vector3f& point_position)> get_distance): Shader(){
         this->do_outline = false;
-        this->light_position = light_position;
+        this->get_distance = get_distance;
     }
 
     void shade(const Obj::ObjSet* obj,
@@ -31,14 +31,18 @@ public:
         float* top_p,
         const bool verbose){
 
+        if(!get_distance){
+            throw Manga3DException("Raster::SMShader::shade(), get_distance function pointer lost");
+        }
         Eigen::Vector3f point = triangle->get_position_from_barycentric(bc_coord);
-        float z = -(point - this->light_position).norm();
+        float z = -get_distance(point);
         if(z < *z_p){
             return;
         }
         *z_p = z;
         if(verbose){
-            color_assign(fill_color * (-z / (light_position.norm() * 3)), top_p);
+            Eigen::Vector3f origin(0,0,0);
+            color_assign(fill_color * (-z / (get_distance(origin) * 3)), top_p);
         }
     }
 };
@@ -53,8 +57,11 @@ public:
     float I;
     Raster::Camera camera;
     Light(float I): I(I), camera(Raster::Color(0), 1, 1){}
-    virtual void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position){
+    virtual void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat){
         throw Manga3DException("Raster::Light::config() is called, thus not doing anything.");
+    }
+    virtual float get_distance(Eigen::Vector3f& point_position){
+        throw Manga3DException("Raster::Light::get_distance() is called, thus not doing anything.");
     }
     virtual void cast_shadow(std::vector<Obj::ObjSet*>& obj_set, bool verbose){
         throw Manga3DException("Raster::Light::cast_shadow() is called, thus not doing anything.");
@@ -70,12 +77,15 @@ public:
 class Raster::PointLight: public Raster::Light{
 public:
     PointLight(float I): Light(I){}
-    void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position){
-        Eigen::Vector3f lookat = -position;
-        this->camera.config(Raster::Camera::Projection::PERSP, bg_color, w, w, fovY, position, lookat);
+    void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat){
+        Eigen::Vector3f lookat_ = -position;
+        this->camera.config(Raster::Camera::Projection::PERSP, bg_color, w, w, fovY, position, lookat_);
+    }
+    float get_distance(Eigen::Vector3f& point_position){
+        return (this->camera.position - point_position).norm();
     }
     void cast_shadow(std::vector<Obj::ObjSet*>& obj_set, bool verbose){
-        SMShader smshader(this->camera.position);
+        SMShader smshader(std::bind(&get_distance, this, std::placeholders::_1));
         this->camera.paint(smshader, obj_set, camera.bg_color, true, verbose);
         if(verbose){
             std::cout << "Raster::PointLight::cast_shadow() complete" << std::endl;
@@ -90,12 +100,15 @@ public:
 class Raster::SunLight: public Raster::Light{
 public:
     SunLight(float I): Light(I){}
-    void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position){
-        Eigen::Vector3f true_position = -position;
-        this->camera.config(Raster::Camera::Projection::ORTHO, bg_color, w, w, fovY, true_position, position);
+    void config(Raster::Color& bg_color, int w, float fovY, Eigen::Vector3f& position, Eigen::Vector3f& lookat){
+        Eigen::Vector3f position_ = -lookat * 100;
+        this->camera.config(Raster::Camera::Projection::ORTHO, bg_color, w, w, fovY, position_, lookat);
+    }
+    float get_distance(Eigen::Vector3f& point_position){
+        return point_position.dot(this->camera.lookat_g);
     }
     void cast_shadow(std::vector<Obj::ObjSet*>& obj_set, bool verbose){
-        SMShader smshader(this->camera.position);
+        SMShader smshader(std::bind(&get_distance, this, std::placeholders::_1));
         this->camera.paint(smshader, obj_set, camera.bg_color, true, verbose);
         if(verbose){
             std::cout << "Raster::SunLight::cast_shadow() complete" << std::endl;

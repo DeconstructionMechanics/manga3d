@@ -74,7 +74,7 @@ public:
             return;
         }
         light->index = this->lights.size();
-        light->config(light_color, sm_resolution, sm_fov, position_lookat);
+        light->config(light_color, sm_resolution, sm_fov, position_lookat, position_lookat);
         this->lights.push_back(light);
     }
 
@@ -108,10 +108,28 @@ public:
         }
     }
     inline void paint_phoneshading(const Raster::Color fill_color, float shadow_bias = 0.05, bool pcf = false, bool paint_back = false, bool verbose = false){
-        PhoneShader phone_shader(lights, shadow_bias, pcf);
-        camera.paint(phone_shader, this->obj_set, fill_color, paint_back, verbose);
+        Raster::Color line_color(fill_color.image_color,0,1);
+        DiscreteShader discrete_shader(lights, shadow_bias, pcf);
+        discrete_shader.set_outline(2,1,1,line_color);
+        camera.paint(discrete_shader, this->obj_set, fill_color, paint_back, verbose);
         if(verbose){
             std::cout << "End paint_phoneshading()" << std::endl;
+        }
+    }
+
+    void fxaa(){
+        for(int y = 0; y < this->camera.h;y += 2){
+            for(int x = 0;x < this->camera.w;x += 2){
+                Raster::Color xy(this->camera.bg_color.image_color,this->camera.get_top_buff(x,y));
+                Raster::Color x1y(this->camera.bg_color.image_color,this->camera.get_top_buff(x+1,y));
+                Raster::Color xy1(this->camera.bg_color.image_color,this->camera.get_top_buff(x,y+1));
+                Raster::Color x1y1(this->camera.bg_color.image_color,this->camera.get_top_buff(x+1,y+1));
+                bool xy_change;
+                bool x1y_change;
+                bool xy1_change;
+                bool x1y1_change;
+                
+            }
         }
     }
 };

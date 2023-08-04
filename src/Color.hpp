@@ -58,6 +58,12 @@ public:
         color = new float[1];
         color[0] = g;
     }
+    Color(ImageColor image_color, float* f): image_color(image_color){
+        color = new float[(int)image_color];
+        for(int i = 0;i < (int)image_color;i++){
+            color[i] = f[i];
+        }
+    }
     Color(ImageColor image_color, float g, float alpha): image_color(image_color){
         color = new float[(int)image_color];
         for(int i = 0;i < (int)image_color - 1;i++){

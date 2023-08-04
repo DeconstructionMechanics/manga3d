@@ -59,11 +59,11 @@ int main(){
     // Raster::Rasterizer rasterizer(".\\model\\cow\\spot_triangulated.obj", ".\\model\\cow\\spot_texture.png");
     std::cout << "load complete" << std::endl << std::endl;
     rasterizer.add_light(Raster::Rasterizer::LightType::POINTLIGHT,20,Raster::Color(1,1,1,1),1024,PI / 2,Eigen::Vector3f(2,4,4));
-    rasterizer.add_light(Raster::Rasterizer::LightType::SUNLIGHT,2,Raster::Color(1,1,1,1),1024,PI / 1.1,Eigen::Vector3f(1,0,0));
+    // rasterizer.add_light(Raster::Rasterizer::LightType::SUNLIGHT,2,Raster::Color(1,1,1,1),1024,PI / 1.1,Eigen::Vector3f(1,0,0));
     rasterizer.shadow_bake(true);
 
-    Eigen::Vector3f position(1, 0, 5);
-    Eigen::Vector3f lookat(-1, 0, -5);
+    Eigen::Vector3f position(-1, 0, 5);
+    Eigen::Vector3f lookat = -position;
     rasterizer.config_camera(Raster::Camera::Projection::PERSP, bg_color, 900, 600, PI / 2, position, lookat);
 
     std::cout << std::endl << "rendering" << std::endl << std::endl;
@@ -71,8 +71,7 @@ int main(){
     rasterizer.paint_phoneshading(fill_color,0.05,false,false,true);
 
     std::cout << std::endl << "showing image" << std::endl;
-    show_image(rasterizer.camera);//, "monkeyframe");
-
+    show_image(rasterizer.camera, "monkey");
 
     return 0;
 }
