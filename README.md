@@ -1,5 +1,5 @@
 # manga3d
-manga style 3d renderer, improving
+manga style 3d renderer
 
 ## latest demo
 ![](output/monkey.png)
@@ -9,3 +9,8 @@ manga style 3d renderer, improving
 
 `rasterizer.paint_outline_simple();`
 ![](output/outline.png)
+
+## features to add
+- crosshatch simulation
+- complex texture
+- blender addon
