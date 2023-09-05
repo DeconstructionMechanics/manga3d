@@ -1,5 +1,5 @@
 # manga3d
-manga style 3d renderer
+manga style 3d renderer, improving
 
 ## latest demo
 ![](output/monkey.png)
